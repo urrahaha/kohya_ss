@@ -219,6 +219,7 @@ def save_configuration(
     extra_accelerate_launch_args,
     LyCORIS_preset,
     debiased_estimation_loss,
+    zero_terminal_snr,
     huggingface_repo_id,
     huggingface_token,
     huggingface_repo_type,
@@ -424,6 +425,7 @@ def open_configuration(
     extra_accelerate_launch_args,
     LyCORIS_preset,
     debiased_estimation_loss,
+    zero_terminal_snr,
     huggingface_repo_id,
     huggingface_token,
     huggingface_repo_type,
@@ -659,6 +661,7 @@ def train_model(
     extra_accelerate_launch_args,
     LyCORIS_preset,
     debiased_estimation_loss,
+    zero_terminal_snr,  # Add the new parameter here
     huggingface_repo_id,
     huggingface_token,
     huggingface_repo_type,
@@ -1232,6 +1235,7 @@ def train_model(
         "wandb_run_name": wandb_run_name,
         "weighted_captions": weighted_captions,
         "xformers": True if xformers == "xformers" else None,
+        "zero_terminal_snr": zero_terminal_snr,  # Add the new parameter here
     }
 
     # Given dictionary `config_toml_data`
@@ -2306,6 +2310,7 @@ def lora_tab(
             accelerate_launch.extra_accelerate_launch_args,
             LyCORIS_preset,
             advanced_training.debiased_estimation_loss,
+            advanced_training.zero_terminal_snr,  # Add the new parameter here
             huggingface.huggingface_repo_id,
             huggingface.huggingface_token,
             huggingface.huggingface_repo_type,

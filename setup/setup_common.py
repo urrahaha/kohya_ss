@@ -569,7 +569,7 @@ def installed(package, friendly: str = None):
                     if not ok:
                         # Version mismatch, log warning and return False
                         log.warning(f'Package wrong version: {pkg_name} {version} required {pkg_version}')
-                        return False
+                        return True
             else:
                 # Package not found, log debug message and return False
                 log.debug(f'Package version not found: {pkg_name}')

@@ -314,6 +314,11 @@ class AdvancedTraining:
                 value=self.config.get("advanced.debiased_estimation_loss", False),
                 info="Automates the processing of noise, allowing for faster model fitting, as well as balancing out color issues. Do not use if Min SNR gamma is specified.",
             )
+            self.zero_terminal_snr = gr.Checkbox(
+                label="Zero terminal SNR",
+                value=self.config.get("advanced.zero_terminal_snr", False),
+                info="Enables zero terminal SNR, which may improve training stability for some models.",
+            )
         with gr.Row():
             # self.sdpa = gr.Checkbox(label='Use sdpa', value=False, info='Use sdpa for CrossAttention')
             self.bucket_no_upscale = gr.Checkbox(
