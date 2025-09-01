@@ -121,9 +121,11 @@ def check_if_model_exist(
     Returns:
     bool: True if the model already exists and the user chooses not to overwrite it, otherwise False.
     """
-    if headless:
+    # Check if running in headless mode or no display available
+    import os
+    if headless or not os.environ.get('DISPLAY'):
         log.info(
-            "Headless mode, skipping verification if model already exist... if model already exist it will be overwritten..."
+            "Headless mode or no display available, skipping verification if model already exist... if model already exist it will be overwritten..."
         )
         return False
 

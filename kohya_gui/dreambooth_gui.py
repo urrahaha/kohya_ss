@@ -180,6 +180,19 @@ def save_configuration(
     disable_mmap_load_safetensors,
     fused_backward_pass,
     fused_optimizer_groups,
+    sdxl_flow_matching,
+    fm_shift,
+    fm_logit_mean,
+    fm_logit_std,
+    fm_mode_scale,
+    # Profiler params for SDXL Flow Matching
+    profile,
+    profile_dir,
+    profile_wait,
+    profile_warmup,
+    profile_active,
+    naive_fm,
+    diffusion_parameterization,
     sdxl_cache_text_encoder_outputs,
     sdxl_no_half_vae,
     min_timestep,
@@ -391,6 +404,19 @@ def open_configuration(
     disable_mmap_load_safetensors,
     fused_backward_pass,
     fused_optimizer_groups,
+    sdxl_flow_matching,
+    fm_shift,
+    fm_logit_mean,
+    fm_logit_std,
+    fm_mode_scale,
+    # Profiler params for SDXL Flow Matching
+    profile,
+    profile_dir,
+    profile_wait,
+    profile_warmup,
+    profile_active,
+    naive_fm,
+    diffusion_parameterization,
     sdxl_cache_text_encoder_outputs,
     sdxl_no_half_vae,
     min_timestep,
@@ -597,6 +623,19 @@ def train_model(
     disable_mmap_load_safetensors,
     fused_backward_pass,
     fused_optimizer_groups,
+    sdxl_flow_matching,
+    fm_shift,
+    fm_logit_mean,
+    fm_logit_std,
+    fm_mode_scale,
+    # Profiler params for SDXL Flow Matching
+    profile,
+    profile_dir,
+    profile_wait,
+    profile_warmup,
+    profile_active,
+    naive_fm,
+    diffusion_parameterization,
     sdxl_cache_text_encoder_outputs,
     sdxl_no_half_vae,
     min_timestep,
@@ -850,7 +889,32 @@ def train_model(
     )
 
     if sdxl:
-        run_cmd.append(rf"{scriptdir}/sd-scripts/sdxl_train.py")
+        if sdxl_flow_matching:
+            run_cmd.append(rf"{scriptdir}/sd-scripts/sdxl_train_fm.py")
+            run_cmd += [
+                "--fm_shift",
+                str(fm_shift),
+                "--fm_logit_mean",
+                str(fm_logit_mean),
+                "--fm_logit_std",
+                str(fm_logit_std),
+                "--fm_mode_scale",
+                str(fm_mode_scale),
+            ]
+            # Profiler options
+            if profile:
+                run_cmd.append("--profile")
+                if profile_dir not in (None, ""):
+                    run_cmd += ["--profile_dir", str(profile_dir)]
+                # Only append if provided (ints default to 0 treated as explicit value)
+                if profile_wait is not None:
+                    run_cmd += ["--profile_wait", str(int(profile_wait))]
+                if profile_warmup is not None:
+                    run_cmd += ["--profile_warmup", str(int(profile_warmup))]
+                if profile_active is not None:
+                    run_cmd += ["--profile_active", str(int(profile_active))]
+        else:
+            run_cmd.append(rf"{scriptdir}/sd-scripts/sdxl_train.py")
     elif sd3_checkbox:
         run_cmd.append(rf"{scriptdir}/sd-scripts/sd3_train.py")
     elif flux1_checkbox:
@@ -1030,6 +1094,19 @@ def train_model(
             stop_text_encoder_training if stop_text_encoder_training != 0 else None
         ),
         "t5xxl": t5xxl if sd3_checkbox else flux1_t5xxl if flux1_checkbox else None,
+        # SDXL Flow Matching parameters (only when SDXL + FM)
+        "fm_shift": fm_shift if (sdxl and sdxl_flow_matching) else None,
+        "fm_logit_mean": fm_logit_mean if (sdxl and sdxl_flow_matching) else None,
+        "fm_logit_std": fm_logit_std if (sdxl and sdxl_flow_matching) else None,
+        "fm_mode_scale": fm_mode_scale if (sdxl and sdxl_flow_matching) else None,
+        # Profiler parameters (SDXL Flow Matching only)
+        "profile": profile if (sdxl and sdxl_flow_matching and profile) else None,
+        "profile_dir": profile_dir if (sdxl and sdxl_flow_matching and profile) else None,
+        "profile_wait": int(profile_wait) if (sdxl and sdxl_flow_matching and profile) else None,
+        "profile_warmup": int(profile_warmup) if (sdxl and sdxl_flow_matching and profile) else None,
+        "profile_active": int(profile_active) if (sdxl and sdxl_flow_matching and profile) else None,
+        "naive_fm": naive_fm if sdxl else None,
+        "diffusion_parameterization": diffusion_parameterization if sdxl else None,
         "train_batch_size": train_batch_size,
         "train_data_dir": train_data_dir,
         "train_text_encoder": train_text_encoder if sdxl else None,
@@ -1221,7 +1298,7 @@ def dreambooth_tab(
             sdxl_params = SDXLParameters(
                 source_model.sdxl_checkbox,
                 config=config,
-                trainer="finetune",
+                trainer="dreambooth",
             )
 
             # Add FLUX1 Parameters
@@ -1381,6 +1458,19 @@ def dreambooth_tab(
             sdxl_params.disable_mmap_load_safetensors,
             sdxl_params.fused_backward_pass,
             sdxl_params.fused_optimizer_groups,
+            sdxl_params.sdxl_flow_matching,
+            sdxl_params.fm_shift,
+            sdxl_params.fm_logit_mean,
+            sdxl_params.fm_logit_std,
+            sdxl_params.fm_mode_scale,
+            # Profiler (SDXL Flow Matching)
+            sdxl_params.profile,
+            sdxl_params.profile_dir,
+            sdxl_params.profile_wait,
+            sdxl_params.profile_warmup,
+            sdxl_params.profile_active,
+            sdxl_params.naive_fm,
+            sdxl_params.diffusion_parameterization,
             sdxl_params.sdxl_cache_text_encoder_outputs,
             sdxl_params.sdxl_no_half_vae,
             advanced_training.min_timestep,

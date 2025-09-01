@@ -42,6 +42,11 @@ test/ft
 # Temporary requirements
 requirements_tmp_for_setup.txt
 
+# MEGA
+.debris/
+.directory
+.megaignore
+
 *.npz
 presets/*/user_presets/*
 inputs

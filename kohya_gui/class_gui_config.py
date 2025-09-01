@@ -15,6 +15,8 @@ class KohyaSSGUIConfig:
         """
         Initialize the KohyaSSGUIConfig class.
         """
+        # Remember the path used so we can save back to the same file later.
+        self.config_file_path = config_file_path
         self.config = self.load_config(config_file_path=config_file_path)
 
     def load_config(self, config_file_path: str = "./config.toml") -> dict:
@@ -37,16 +39,26 @@ class KohyaSSGUIConfig:
 
         return config
 
-    def save_config(self, config: dict, config_file_path: str = "./config.toml"):
+    def save_config(self, config: dict, config_file_path: str = None):
         """
         Saves the Kohya SS GUI configuration to a TOML file.
 
         Parameters:
         - config (dict): The configuration data to save.
         """
+        # Default to the original path if none is provided
+        target_path = (
+            config_file_path if config_file_path is not None else self.config_file_path
+        )
+        if target_path is None or target_path == "":
+            target_path = "./config.toml"
+
         # Write the configuration data to the TOML file
-        with open(f"{config_file_path}", "w", encoding="utf-8") as f:
+        with open(f"{target_path}", "w", encoding="utf-8") as f:
             toml.dump(config, f)
+
+        # Keep in-memory config in sync
+        self.config = config
 
     def get(self, key: str, default=None):
         """

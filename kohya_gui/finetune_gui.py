@@ -187,6 +187,16 @@ def save_configuration(
     disable_mmap_load_safetensors,
     fused_backward_pass,
     fused_optimizer_groups,
+    sdxl_flow_matching,
+    fm_shift,
+    fm_logit_mean,
+    fm_logit_std,
+    fm_mode_scale,
+    profile,
+    profile_dir,
+    profile_wait,
+    profile_warmup,
+    profile_active,
     sdxl_cache_text_encoder_outputs,
     sdxl_no_half_vae,
     min_timestep,
@@ -318,8 +328,8 @@ def open_configuration(
     learning_rate_te2,
     train_text_encoder,
     full_bf16,
-    create_caption,
-    create_buckets,
+    generate_caption_database,
+    generate_image_buckets,
     save_model_as,
     caption_extension,
     # use_8bit_adam,
@@ -351,7 +361,7 @@ def open_configuration(
     max_data_loader_n_workers,
     full_fp16,
     color_aug,
-    model_list,
+    model_list,  # Keep this. Yes, it is unused here but required given the common list used
     cache_latents,
     cache_latents_to_disk,
     use_latent_files,
@@ -403,6 +413,16 @@ def open_configuration(
     disable_mmap_load_safetensors,
     fused_backward_pass,
     fused_optimizer_groups,
+    sdxl_flow_matching,
+    fm_shift,
+    fm_logit_mean,
+    fm_logit_std,
+    fm_mode_scale,
+    profile,
+    profile_dir,
+    profile_wait,
+    profile_warmup,
+    profile_active,
     sdxl_cache_text_encoder_outputs,
     sdxl_no_half_vae,
     min_timestep,
@@ -625,6 +645,16 @@ def train_model(
     disable_mmap_load_safetensors,
     fused_backward_pass,
     fused_optimizer_groups,
+    sdxl_flow_matching,
+    fm_shift,
+    fm_logit_mean,
+    fm_logit_std,
+    fm_mode_scale,
+    profile,
+    profile_dir,
+    profile_wait,
+    profile_warmup,
+    profile_active,
     sdxl_cache_text_encoder_outputs,
     sdxl_no_half_vae,
     min_timestep,
@@ -910,7 +940,34 @@ def train_model(
     )
 
     if sdxl_checkbox:
-        run_cmd.append(rf"{scriptdir}/sd-scripts/sdxl_train.py")
+        # Switch to Flow Matching trainer when enabled for SDXL
+        if sdxl_flow_matching:
+            run_cmd.append(rf"{scriptdir}/sd-scripts/sdxl_train_fm.py")
+            # Append Flow Matching specific CLI args
+            run_cmd += [
+                "--fm_shift",
+                str(fm_shift),
+                "--fm_logit_mean",
+                str(fm_logit_mean),
+                "--fm_logit_std",
+                str(fm_logit_std),
+                "--fm_mode_scale",
+                str(fm_mode_scale),
+            ]
+            # Profiler options
+            if profile:
+                run_cmd.append("--profile")
+                if profile_dir not in (None, ""):
+                    run_cmd += ["--profile_dir", str(profile_dir)]
+                # Only append if provided (ints default to 0 treated as explicit value)
+                if profile_wait is not None:
+                    run_cmd += ["--profile_wait", str(int(profile_wait))]
+                if profile_warmup is not None:
+                    run_cmd += ["--profile_warmup", str(int(profile_warmup))]
+                if profile_active is not None:
+                    run_cmd += ["--profile_active", str(int(profile_active))]
+        else:
+            run_cmd.append(rf"{scriptdir}/sd-scripts/sdxl_train.py")
     elif sd3_checkbox:
         run_cmd.append(rf"{scriptdir}/sd-scripts/sd3_train.py")
     elif flux1_checkbox:
@@ -976,6 +1033,17 @@ def train_model(
         "fused_optimizer_groups": (
             int(fused_optimizer_groups) if fused_optimizer_groups > 0 else None
         ),
+        # SDXL Flow Matching parameters
+        "fm_shift": fm_shift if (sdxl_checkbox and sdxl_flow_matching) else None,
+        "fm_logit_mean": fm_logit_mean if (sdxl_checkbox and sdxl_flow_matching) else None,
+        "fm_logit_std": fm_logit_std if (sdxl_checkbox and sdxl_flow_matching) else None,
+        "fm_mode_scale": fm_mode_scale if (sdxl_checkbox and sdxl_flow_matching) else None,
+        # Profiler parameters (SDXL Flow Matching only)
+        "profile": profile if (sdxl_checkbox and sdxl_flow_matching and profile) else None,
+        "profile_dir": profile_dir if (sdxl_checkbox and sdxl_flow_matching and profile) else None,
+        "profile_wait": int(profile_wait) if (sdxl_checkbox and sdxl_flow_matching and profile) else None,
+        "profile_warmup": int(profile_warmup) if (sdxl_checkbox and sdxl_flow_matching and profile) else None,
+        "profile_active": int(profile_active) if (sdxl_checkbox and sdxl_flow_matching and profile) else None,
         "gradient_accumulation_steps": int(gradient_accumulation_steps),
         "gradient_checkpointing": gradient_checkpointing,
         "huber_c": huber_c,
@@ -1499,6 +1567,17 @@ def finetune_tab(
             sdxl_params.disable_mmap_load_safetensors,
             sdxl_params.fused_backward_pass,
             sdxl_params.fused_optimizer_groups,
+            sdxl_params.sdxl_flow_matching,
+            sdxl_params.fm_shift,
+            sdxl_params.fm_logit_mean,
+            sdxl_params.fm_logit_std,
+            sdxl_params.fm_mode_scale,
+            # SDXL profiler controls
+            sdxl_params.profile,
+            sdxl_params.profile_dir,
+            sdxl_params.profile_wait,
+            sdxl_params.profile_warmup,
+            sdxl_params.profile_active,
             sdxl_params.sdxl_cache_text_encoder_outputs,
             sdxl_params.sdxl_no_half_vae,
             advanced_training.min_timestep,

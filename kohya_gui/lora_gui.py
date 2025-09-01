@@ -201,6 +201,9 @@ def save_configuration(
     # sdxl parameters section
     sdxl_cache_text_encoder_outputs,
     sdxl_no_half_vae,
+    sdxl_flow_matching,
+    naive_fm,
+    diffusion_parameterization,
     ###
     text_encoder_lr,
     t5xxl_lr,
@@ -487,6 +490,9 @@ def open_configuration(
     # sdxl parameters section
     sdxl_cache_text_encoder_outputs,
     sdxl_no_half_vae,
+    sdxl_flow_matching,
+    naive_fm,
+    diffusion_parameterization,
     ###
     text_encoder_lr,
     t5xxl_lr,
@@ -864,6 +870,9 @@ def train_model(
     # sdxl parameters section
     sdxl_cache_text_encoder_outputs,
     sdxl_no_half_vae,
+    sdxl_flow_matching,
+    naive_fm,
+    diffusion_parameterization,
     ###
     text_encoder_lr,
     t5xxl_lr,
@@ -1260,13 +1269,24 @@ def train_model(
     )
 
     if sdxl:
-        run_cmd.append(rf"{scriptdir}/sd-scripts/sdxl_train_network.py")
+        if sdxl_flow_matching:
+            run_cmd.append(rf"{scriptdir}/sd-scripts/sdxl_train_network_fm.py")
+        else:
+            run_cmd.append(rf"{scriptdir}/sd-scripts/sdxl_train_network.py")
     elif flux1_checkbox:
         run_cmd.append(rf"{scriptdir}/sd-scripts/flux_train_network.py")
     elif sd3_checkbox:
         run_cmd.append(rf"{scriptdir}/sd-scripts/sd3_train_network.py")
     else:
         run_cmd.append(rf"{scriptdir}/sd-scripts/train_network.py")
+
+    # Diff2Flow flags for SDXL Flow Matching
+    if sdxl and sdxl_flow_matching:
+        # Use Diff2Flow unless Naive FM is explicitly requested
+        if not naive_fm:
+            run_cmd.append("--use_diff2flow")
+            if diffusion_parameterization:
+                run_cmd += ["--d2f_param", f"{diffusion_parameterization}"]
 
     network_args = ""
 
@@ -2914,6 +2934,9 @@ def lora_tab(
             advanced_training.debiased_estimation_loss,
             sdxl_params.sdxl_cache_text_encoder_outputs,
             sdxl_params.sdxl_no_half_vae,
+            sdxl_params.sdxl_flow_matching,
+            sdxl_params.naive_fm,
+            sdxl_params.diffusion_parameterization,
             text_encoder_lr,
             t5xxl_lr,
             unet_lr,
