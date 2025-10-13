@@ -12,14 +12,14 @@ huggingface-hub==0.29.3
 imagesize==1.4.1
 invisible-watermark==0.2.0
 lion-pytorch==0.0.6
-lycoris_lora==3.2.0.post2
+lycoris_lora>=3.2.0.post2
 omegaconf==2.3.0
 onnx==1.16.1
 prodigyopt==1.1.2
 protobuf==3.20.3
 open-clip-torch==2.20.0
 opencv-python==4.10.0.84
-prodigy-plus-schedule-free==2.0.0rc2
+prodigy-plus-schedule-free>=2.0.0rc2
 pytorch-lightning==1.9.0
 pytorch-optimizer==3.5.0
 rich>=13.7.1

@@ -1482,6 +1482,11 @@ def train_model(
             if value:
                 network_args += f" {key}={value}"
 
+    # LoFT
+    if LoRA_type == "LoFT":
+        network_module = "networks.loft"
+        network_args = ""
+
     # Set the text_encoder_lr to multiple values if both text_encoder_lr and t5xxl_lr are set
     if text_encoder_lr == 0 and t5xxl_lr > 0:
         log.error(
@@ -1945,6 +1950,7 @@ def lora_tab(
                         choices=[
                             "Flux1",
                             "Flux1 OFT",
+                            "LoFT",
                             "Kohya DyLoRA",
                             "Kohya LoCon",
                             "LoRA-FA",
@@ -2258,6 +2264,7 @@ def lora_tab(
                             "update_params": {
                                 "visible": LoRA_type
                                 in {
+                                    "LoFT",
                                     "Flux1",
                                     "Flux1 OFT",
                                     "Kohya DyLoRA",
@@ -2314,6 +2321,7 @@ def lora_tab(
                                 in {
                                     "Flux1",
                                     "Flux1 OFT",
+                                    "LoFT",
                                     "Standard",
                                     "LoCon",
                                     "Kohya DyLoRA",
@@ -2324,8 +2332,8 @@ def lora_tab(
                                     "LyCORIS/DyLoRA",
                                     "LyCORIS/GLoRA",
                                     "LyCORIS/LoHa",
-                                    "LyCORIS/LoCon",
                                     "LyCORIS/LoKr",
+                                    "LyCORIS/LoCon",
                                 },
                             },
                         },
