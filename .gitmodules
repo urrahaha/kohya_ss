@@ -1,3 +1,6 @@
 [submodule "sd-scripts"]
     path = sd-scripts
     url = https://github.com/kohya-ss/sd-scripts.git
+[submodule "reference_repos/NLoRA"]
+	path = reference_repos/NLoRA
+	url = https://github.com/TracyGuo2001/NLoRA
