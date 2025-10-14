@@ -33,6 +33,8 @@ from .class_basic_training import BasicTraining
 from .class_advanced_training import AdvancedTraining
 from .class_sd3 import sd3Training
 from .class_sdxl_parameters import SDXLParameters
+from .class_srpo_training import SRPOTraining
+from .class_neon_training import NeonTraining
 from .class_folders import Folders
 from .class_command_executor import CommandExecutor
 from .class_tensorboard import TensorboardManager
@@ -322,6 +324,30 @@ def save_configuration(
     sd3_text_encoder_batch_size,
     weighting_scheme,
     sd3_checkbox,
+    # SRPO parameters
+    srpo_enable,
+    srpo_use_reward_model,
+    srpo_reward_model,
+    srpo_timestep_length,
+    srpo_discount_pos_start,
+    srpo_discount_pos_end,
+    srpo_discount_inv_start,
+    srpo_discount_inv_end,
+    srpo_train_timestep_start,
+    srpo_train_timestep_end,
+    srpo_groundtruth_ratio,
+    srpo_guidance_scale,
+    srpo_reward_threshold,
+    srpo_positive_controls,
+    srpo_negative_controls,
+    # Neon parameters
+    neon_enable,
+    neon_save_pre_post,
+    neon_synthetic_dataset_dir,
+    neon_post_training_epochs,
+    neon_post_training_steps,
+    neon_synthetic_image_percent,
+    neon_extrapolation_weight,
 ):
     # Get list of function parameters and values
     parameters = list(locals().items())
@@ -611,6 +637,30 @@ def open_configuration(
     sd3_text_encoder_batch_size,
     weighting_scheme,
     sd3_checkbox,
+    # SRPO parameters
+    srpo_enable,
+    srpo_use_reward_model,
+    srpo_reward_model,
+    srpo_timestep_length,
+    srpo_discount_pos_start,
+    srpo_discount_pos_end,
+    srpo_discount_inv_start,
+    srpo_discount_inv_end,
+    srpo_train_timestep_start,
+    srpo_train_timestep_end,
+    srpo_groundtruth_ratio,
+    srpo_guidance_scale,
+    srpo_reward_threshold,
+    srpo_positive_controls,
+    srpo_negative_controls,
+    # Neon parameters
+    neon_enable,
+    neon_save_pre_post,
+    neon_synthetic_dataset_dir,
+    neon_post_training_epochs,
+    neon_post_training_steps,
+    neon_synthetic_image_percent,
+    neon_extrapolation_weight,
     ##
     training_preset,
 ):
@@ -679,6 +729,7 @@ def open_configuration(
         "LyCORIS/LoKr",
         "LyCORIS/LoCon",
         "LyCORIS/GLoRA",
+        "NLoRA",
     }:
         values.append(gr.Row(visible=True))
     else:
@@ -991,6 +1042,30 @@ def train_model(
     sd3_text_encoder_batch_size,
     weighting_scheme,
     sd3_checkbox,
+    # SRPO parameters
+    srpo_enable,
+    srpo_use_reward_model,
+    srpo_reward_model,
+    srpo_timestep_length,
+    srpo_discount_pos_start,
+    srpo_discount_pos_end,
+    srpo_discount_inv_start,
+    srpo_discount_inv_end,
+    srpo_train_timestep_start,
+    srpo_train_timestep_end,
+    srpo_groundtruth_ratio,
+    srpo_guidance_scale,
+    srpo_reward_threshold,
+    srpo_positive_controls,
+    srpo_negative_controls,
+    # Neon parameters
+    neon_enable,
+    neon_save_pre_post,
+    neon_synthetic_dataset_dir,
+    neon_post_training_epochs,
+    neon_post_training_steps,
+    neon_synthetic_image_percent,
+    neon_extrapolation_weight,
 ):
     # Get list of function parameters and values
     parameters = list(locals().items())
@@ -1395,7 +1470,7 @@ def train_model(
             if value:
                 network_args += f" {key}={value}"
 
-    if LoRA_type in ["Kohya LoCon", "Standard"]:
+    if LoRA_type in ["Kohya LoCon", "Standard", "NLoRA"]:
         kohya_lora_var_list = [
             "down_lr_weight",
             "mid_lr_weight",
@@ -1408,7 +1483,10 @@ def train_model(
             "rank_dropout",
             "module_dropout",
         ]
-        network_module = "networks.lora_sd3" if sd3_checkbox else "networks.lora"
+        if LoRA_type == "NLoRA":
+            network_module = "networks.nlora"
+        else:
+            network_module = "networks.lora_sd3" if sd3_checkbox else "networks.lora"
         kohya_lora_vars = {
             key: value
             for key, value in vars().items()
@@ -1786,6 +1864,27 @@ def train_model(
         "blocks_to_swap": blocks_to_swap if flux1_checkbox or sd3_checkbox else None,
         "single_blocks_to_swap": single_blocks_to_swap if flux1_checkbox else None,
         "double_blocks_to_swap": double_blocks_to_swap if flux1_checkbox else None,
+        # SRPO parameters
+        "srpo_enable": srpo_enable if srpo_enable else None,
+        "srpo_use_reward_model": srpo_use_reward_model if srpo_enable else None,
+        "srpo_reward_model": srpo_reward_model if srpo_enable else None,
+        "srpo_timestep_length": int(srpo_timestep_length) if srpo_enable else None,
+        "srpo_discount_pos": [float(srpo_discount_pos_start), float(srpo_discount_pos_end)] if srpo_enable else None,
+        "srpo_discount_inv": [float(srpo_discount_inv_start), float(srpo_discount_inv_end)] if srpo_enable else None,
+        "srpo_train_timestep": [int(srpo_train_timestep_start), int(srpo_train_timestep_end)] if srpo_enable else None,
+        "srpo_groundtruth_ratio": float(srpo_groundtruth_ratio) if srpo_enable else None,
+        "srpo_guidance_scale": float(srpo_guidance_scale) if srpo_enable else None,
+        "srpo_reward_threshold": float(srpo_reward_threshold) if srpo_enable else None,
+        "srpo_positive_controls": [word.strip() for word in srpo_positive_controls.split(",")] if (srpo_enable and srpo_positive_controls and srpo_positive_controls.strip()) else None,
+        "srpo_negative_controls": [word.strip() for word in srpo_negative_controls.split(",")] if (srpo_enable and srpo_negative_controls and srpo_negative_controls.strip()) else None,
+        # Neon parameters
+        "neon_enable": neon_enable if neon_enable else None,
+        "neon_save_pre_post": neon_save_pre_post if neon_enable else None,
+        "neon_synthetic_dataset_dir": neon_synthetic_dataset_dir if neon_enable else None,
+        "neon_post_training_epochs": int(neon_post_training_epochs) if neon_enable else None,
+        "neon_post_training_steps": int(neon_post_training_steps) if neon_enable else None,
+        "neon_synthetic_image_percent": float(neon_synthetic_image_percent) if neon_enable else None,
+        "neon_extrapolation_weight": float(neon_extrapolation_weight) if neon_enable else None,
     }
 
     # Given dictionary `config_toml_data`
@@ -1963,6 +2062,7 @@ def lora_tab(
                             "LyCORIS/LoHa",
                             "LyCORIS/LoKr",
                             "LyCORIS/Native Fine-Tuning",
+                            "NLoRA",
                             "Standard",
                         ],
                         value="Standard",
@@ -2277,6 +2377,7 @@ def lora_tab(
                                     "LyCORIS/LoCon",
                                     "LyCORIS/LoHa",
                                     "LyCORIS/LoKr",
+                                    "NLoRA",
                                     "Standard",
                                 },
                             },
@@ -2323,6 +2424,7 @@ def lora_tab(
                                     "Flux1 OFT",
                                     "LoFT",
                                     "Standard",
+                                    "NLoRA",
                                     "LoCon",
                                     "Kohya DyLoRA",
                                     "Kohya LoCon",
@@ -2345,6 +2447,7 @@ def lora_tab(
                                     "Flux1",
                                     "Flux1 OFT",
                                     "Standard",
+                                    "NLoRA",
                                     "LoCon",
                                     "Kohya DyLoRA",
                                     "Kohya LoCon",
@@ -2367,6 +2470,7 @@ def lora_tab(
                                     "Flux1",
                                     "Flux1 OFT",
                                     "Standard",
+                                    "NLoRA",
                                     "LoCon",
                                     "Kohya DyLoRA",
                                     "Kohya LoCon",
@@ -2556,6 +2660,7 @@ def lora_tab(
                                     "LyCORIS/LoHa",
                                     "LyCORIS/LoCon",
                                     "LyCORIS/LoKr",
+                                    "NLoRA",
                                     "Standard",
                                 },
                             },
@@ -2577,6 +2682,7 @@ def lora_tab(
                                     "LyCORIS/LoHa",
                                     "LyCORIS/LoKr",
                                     "LyCORIS/Native Fine-Tuning",
+                                    "NLoRA",
                                     "Standard",
                                 },
                             },
@@ -2594,6 +2700,7 @@ def lora_tab(
                                     "LyCORIS/LoCon",
                                     "LyCORIS/LoHa",
                                     "LyCORIS/LoKR",
+                                    "NLoRA",
                                     "Kohya LoCon",
                                     "LoRA-FA",
                                     "LyCORIS/Native Fine-Tuning",
@@ -2614,6 +2721,7 @@ def lora_tab(
                                     "LyCORIS/LoCon",
                                     "LyCORIS/LoHa",
                                     "LyCORIS/LoKR",
+                                    "NLoRA",
                                     "Kohya LoCon",
                                     "LyCORIS/Native Fine-Tuning",
                                     "LoRA-FA",
@@ -2680,6 +2788,7 @@ def lora_tab(
                                     "LyCORIS/LoKR",
                                     "Kohya LoCon",
                                     "LoRA-FA",
+                                    "NLoRA",
                                     "LyCORIS/Native Fine-Tuning",
                                     "Standard",
                                 },
@@ -2760,6 +2869,12 @@ def lora_tab(
                             )
                 advanced_training = AdvancedTraining(
                     headless=headless, training_type="lora", config=config
+                )
+                srpo_training = SRPOTraining(
+                    headless=headless, config=config
+                )
+                neon_training = NeonTraining(
+                    headless=headless, config=config
                 )
                 advanced_training.color_aug.change(
                     color_aug_changed,
@@ -3060,6 +3175,30 @@ def lora_tab(
             sd3_training.sd3_text_encoder_batch_size,
             sd3_training.weighting_scheme,
             source_model.sd3_checkbox,
+            # SRPO parameters
+            srpo_training.srpo_enable,
+            srpo_training.srpo_use_reward_model,
+            srpo_training.srpo_reward_model,
+            srpo_training.srpo_timestep_length,
+            srpo_training.srpo_discount_pos_start,
+            srpo_training.srpo_discount_pos_end,
+            srpo_training.srpo_discount_inv_start,
+            srpo_training.srpo_discount_inv_end,
+            srpo_training.srpo_train_timestep_start,
+            srpo_training.srpo_train_timestep_end,
+            srpo_training.srpo_groundtruth_ratio,
+            srpo_training.srpo_guidance_scale,
+            srpo_training.srpo_reward_threshold,
+            srpo_training.srpo_positive_controls,
+            srpo_training.srpo_negative_controls,
+            # Neon parameters
+            neon_training.neon_enable,
+            neon_training.neon_save_pre_post,
+            neon_training.neon_synthetic_dataset_dir,
+            neon_training.neon_post_training_epochs,
+            neon_training.neon_post_training_steps,
+            neon_training.neon_synthetic_image_percent,
+            neon_training.neon_extrapolation_weight,
         ]
 
         configuration.button_open_config.click(

@@ -4,3 +4,9 @@
 [submodule "reference_repos/NLoRA"]
 	path = reference_repos/NLoRA
 	url = https://github.com/TracyGuo2001/NLoRA
+[submodule "reference_repos/SRPO"]
+	path = reference_repos/SRPO
+	url = https://github.com/Tencent-Hunyuan/SRPO
+[submodule "reference_repos/Neon"]
+	path = reference_repos/Neon
+	url = https://github.com/VITA-Group/Neon

@@ -8,4 +8,5 @@
 -:*.tmp
 -aG:.venv*
 -aG:venv*
+-aG:reference_repos
 -s:*
