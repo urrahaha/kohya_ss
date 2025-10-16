@@ -10,3 +10,6 @@
 [submodule "reference_repos/Neon"]
 	path = reference_repos/Neon
 	url = https://github.com/VITA-Group/Neon
+[submodule "reference_repos/diff2flow"]
+	path = reference_repos/diff2flow
+	url = https://github.com/CompVis/diff2flow
