@@ -2,7 +2,9 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/diff2flow" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/reference_repos/NLoRA" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/reference_repos/Neon" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/reference_repos/SRPO" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/sd-scripts" vcs="Git" />
   </component>
 </project>

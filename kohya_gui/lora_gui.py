@@ -342,12 +342,16 @@ def save_configuration(
     srpo_negative_controls,
     # Neon parameters
     neon_enable,
+    neon_only_post_train,
     neon_save_pre_post,
     neon_synthetic_dataset_dir,
     neon_post_training_epochs,
     neon_post_training_steps,
     neon_synthetic_image_percent,
     neon_extrapolation_weight,
+    neon_generation_batch_size,
+    neon_positive_prefix,
+    neon_negative_prompt,
 ):
     # Get list of function parameters and values
     parameters = list(locals().items())
@@ -655,16 +659,20 @@ def open_configuration(
     srpo_negative_controls,
     # Neon parameters
     neon_enable,
+    neon_only_post_train,
     neon_save_pre_post,
     neon_synthetic_dataset_dir,
     neon_post_training_epochs,
     neon_post_training_steps,
     neon_synthetic_image_percent,
     neon_extrapolation_weight,
+    neon_generation_batch_size,
+    neon_positive_prefix,
+    neon_negative_prompt,
     ##
     training_preset,
 ):
-    # Get list of function parameters and their values
+    # Get list of function parameters and values
     parameters = list(locals().items())
 
     # Determine if a preset configuration is being applied
@@ -719,17 +727,15 @@ def open_configuration(
     if my_data.get("LoRA_type", "Standard") in {
         "Flux1",
         "Flux1 OFT",
-        "LoCon",
-        "Kohya DyLoRA",
-        "Kohya LoCon",
-        "LoRA-FA",
-        "LyCORIS/Diag-OFT",
-        "LyCORIS/DyLoRA",
-        "LyCORIS/LoHa",
+        "full",
+        "full-lin",
+        "unet-transformer-only",
+        "unet-convblock-only",
         "LyCORIS/LoKr",
         "LyCORIS/LoCon",
         "LyCORIS/GLoRA",
         "NLoRA",
+        "AuroRA",
     }:
         values.append(gr.Row(visible=True))
     else:
@@ -1060,12 +1066,16 @@ def train_model(
     srpo_negative_controls,
     # Neon parameters
     neon_enable,
+    neon_only_post_train,
     neon_save_pre_post,
     neon_synthetic_dataset_dir,
     neon_post_training_epochs,
     neon_post_training_steps,
     neon_synthetic_image_percent,
     neon_extrapolation_weight,
+    neon_generation_batch_size,
+    neon_positive_prefix,
+    neon_negative_prompt,
 ):
     # Get list of function parameters and values
     parameters = list(locals().items())
@@ -1470,7 +1480,7 @@ def train_model(
             if value:
                 network_args += f" {key}={value}"
 
-    if LoRA_type in ["Kohya LoCon", "Standard", "NLoRA"]:
+    if LoRA_type in ["Kohya LoCon", "Standard", "NLoRA", "AuroRA"]:
         kohya_lora_var_list = [
             "down_lr_weight",
             "mid_lr_weight",
@@ -1485,6 +1495,8 @@ def train_model(
         ]
         if LoRA_type == "NLoRA":
             network_module = "networks.nlora"
+        elif LoRA_type == "AuroRA":
+            network_module = "networks.aurora"
         else:
             network_module = "networks.lora_sd3" if sd3_checkbox else "networks.lora"
         kohya_lora_vars = {
@@ -1879,12 +1891,16 @@ def train_model(
         "srpo_negative_controls": [word.strip() for word in srpo_negative_controls.split(",")] if (srpo_enable and srpo_negative_controls and srpo_negative_controls.strip()) else None,
         # Neon parameters
         "neon_enable": neon_enable if neon_enable else None,
+        "neon_only_post_train": neon_only_post_train if neon_enable else None,
         "neon_save_pre_post": neon_save_pre_post if neon_enable else None,
         "neon_synthetic_dataset_dir": neon_synthetic_dataset_dir if neon_enable else None,
         "neon_post_training_epochs": int(neon_post_training_epochs) if neon_enable else None,
         "neon_post_training_steps": int(neon_post_training_steps) if neon_enable else None,
         "neon_synthetic_image_percent": float(neon_synthetic_image_percent) if neon_enable else None,
         "neon_extrapolation_weight": float(neon_extrapolation_weight) if neon_enable else None,
+        "neon_generation_batch_size": int(neon_generation_batch_size) if neon_enable else None,
+        "neon_positive_prefix": neon_positive_prefix if neon_enable else None,
+        "neon_negative_prompt": neon_negative_prompt if neon_enable else None,
     }
 
     # Given dictionary `config_toml_data`
@@ -2063,6 +2079,7 @@ def lora_tab(
                             "LyCORIS/LoKr",
                             "LyCORIS/Native Fine-Tuning",
                             "NLoRA",
+                            "AuroRA",
                             "Standard",
                         ],
                         value="Standard",
@@ -2378,6 +2395,7 @@ def lora_tab(
                                     "LyCORIS/LoHa",
                                     "LyCORIS/LoKr",
                                     "NLoRA",
+                                    "AuroRA",
                                     "Standard",
                                 },
                             },
@@ -2409,6 +2427,7 @@ def lora_tab(
                                     "Flux1",
                                     "Flux1 OFT",
                                     "Standard",
+                                    "AuroRA",
                                     "Kohya DyLoRA",
                                     "Kohya LoCon",
                                     "LoRA-FA",
@@ -2425,6 +2444,7 @@ def lora_tab(
                                     "LoFT",
                                     "Standard",
                                     "NLoRA",
+                                    "AuroRA",
                                     "LoCon",
                                     "Kohya DyLoRA",
                                     "Kohya LoCon",
@@ -2448,6 +2468,7 @@ def lora_tab(
                                     "Flux1 OFT",
                                     "Standard",
                                     "NLoRA",
+                                    "AuroRA",
                                     "LoCon",
                                     "Kohya DyLoRA",
                                     "Kohya LoCon",
@@ -2471,6 +2492,7 @@ def lora_tab(
                                     "Flux1 OFT",
                                     "Standard",
                                     "NLoRA",
+                                    "AuroRA",
                                     "LoCon",
                                     "Kohya DyLoRA",
                                     "Kohya LoCon",
@@ -2661,6 +2683,7 @@ def lora_tab(
                                     "LyCORIS/LoCon",
                                     "LyCORIS/LoKr",
                                     "NLoRA",
+                                    "AuroRA",
                                     "Standard",
                                 },
                             },
@@ -2683,6 +2706,7 @@ def lora_tab(
                                     "LyCORIS/LoKr",
                                     "LyCORIS/Native Fine-Tuning",
                                     "NLoRA",
+                                    "AuroRA",
                                     "Standard",
                                 },
                             },
@@ -2704,6 +2728,7 @@ def lora_tab(
                                     "Kohya LoCon",
                                     "LoRA-FA",
                                     "LyCORIS/Native Fine-Tuning",
+                                    "AuroRA",
                                     "Standard",
                                 },
                             },
@@ -2725,6 +2750,7 @@ def lora_tab(
                                     "Kohya LoCon",
                                     "LyCORIS/Native Fine-Tuning",
                                     "LoRA-FA",
+                                    "AuroRA",
                                     "Standard",
                                 },
                             },
@@ -2790,6 +2816,7 @@ def lora_tab(
                                     "LoRA-FA",
                                     "NLoRA",
                                     "LyCORIS/Native Fine-Tuning",
+                                    "AuroRA",
                                     "Standard",
                                 },
                             },
@@ -3193,12 +3220,16 @@ def lora_tab(
             srpo_training.srpo_negative_controls,
             # Neon parameters
             neon_training.neon_enable,
+            neon_training.neon_only_post_train,
             neon_training.neon_save_pre_post,
             neon_training.neon_synthetic_dataset_dir,
             neon_training.neon_post_training_epochs,
             neon_training.neon_post_training_steps,
             neon_training.neon_synthetic_image_percent,
             neon_training.neon_extrapolation_weight,
+            neon_training.neon_generation_batch_size,
+            neon_training.neon_positive_prefix,
+            neon_training.neon_negative_prompt,
         ]
 
         configuration.button_open_config.click(

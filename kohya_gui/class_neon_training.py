@@ -51,9 +51,16 @@ class NeonTraining:
                     self.neon_enable = gr.Checkbox(
                         label="Enable Neon Post-Training",
                         value=self.config.get("neon.enable", False),
-                        info="Automatically generate synthetic data + post-train + merge after main training"
+                        info="Automatically generates synthetic data and applies Neon post-training after main training"
                     )
-                
+                with gr.Column():
+                    self.neon_only_post_train = gr.Checkbox(
+                        label="Only Post-Train (Skip Main Training)",
+                        value=self.config.get("neon.only_post_train", False),
+                        info="Skip normal training and only do Neon post-training with existing LoRA (requires LoRA weights in Basic tab)"
+                    )
+            
+            with gr.Row():
                 with gr.Column():
                     self.neon_save_pre_post = gr.Checkbox(
                         label="Save Pre-Post Model",
@@ -110,6 +117,34 @@ class NeonTraining:
                             info="Merge strength. Typical: 0.1-0.5 (default: 0.3)"
                         )
                 
+                with gr.Row():
+                    with gr.Column():
+                        self.neon_generation_batch_size = gr.Number(
+                            label="Generation Batch Size",
+                            value=self.config.get("neon.generation_batch_size", 1),
+                            minimum=1,
+                            precision=0,
+                            info="Number of images to generate per batch during Neon synthetic generation (higher = faster, uses more VRAM)"
+                        )
+
+                with gr.Row():
+                    with gr.Column():
+                        self.neon_positive_prefix = gr.Textbox(
+                            label="Positive Prefix (prepended)",
+                            value=self.config.get("neon.positive_prefix", ""),
+                            placeholder="e.g. high quality, detailed, 4k",
+                            lines=1,
+                            info="This text is prepended to each caption during synthetic generation"
+                        )
+                    with gr.Column():
+                        self.neon_negative_prompt = gr.Textbox(
+                            label="Negative Prompt",
+                            value=self.config.get("neon.negative_prompt", ""),
+                            placeholder="e.g. low quality, blurry",
+                            lines=1,
+                            info="Used as unconditional text (negative) during generation"
+                        )
+
                 gr.Markdown(
                     """
                     ### 📖 Usage Guide:
