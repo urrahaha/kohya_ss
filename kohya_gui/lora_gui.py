@@ -1492,6 +1492,9 @@ def train_model(
             "conv_block_alphas",
             "rank_dropout",
             "module_dropout",
+            "spline_gate",
+            "spline_scale",
+            "spline_centers",
         ]
         if LoRA_type == "NLoRA":
             network_module = "networks.nlora"
@@ -2821,6 +2824,24 @@ def lora_tab(
                                 },
                             },
                         },
+                        "spline_gate": {
+                            "gr_type": gr.Number,
+                            "update_params": {
+                                "visible": LoRA_type in {"AuroRA"},
+                            },
+                        },
+                        "spline_scale": {
+                            "gr_type": gr.Textbox,
+                            "update_params": {
+                                "visible": LoRA_type in {"AuroRA"},
+                            },
+                        },
+                        "spline_centers": {
+                            "gr_type": gr.Textbox,
+                            "update_params": {
+                                "visible": LoRA_type in {"AuroRA"},
+                            },
+                        },
                     }
 
                     results = []
@@ -2869,6 +2890,22 @@ def lora_tab(
                                 label="Blocks LR zero threshold",
                                 placeholder="(Optional) eg: 0.1",
                                 info="If the weight is not more than this value, the LoRA module is not created. The default is 0.",
+                            )
+                        with gr.Row(visible=True):
+                            spline_gate = gr.Number(
+                                label="AuroRA spline gate (beta)",
+                                value=0,
+                                info="(Optional) 0 disables spline; >0 enables learnable augmentation.",
+                            )
+                            spline_scale = gr.Textbox(
+                                label="AuroRA spline scale",
+                                placeholder="(Optional) eg: 1.5",
+                                info="Scale factor for spline basis; leave empty to use default.",
+                            )
+                            spline_centers = gr.Textbox(
+                                label="AuroRA spline centers",
+                                placeholder="(Optional) eg: -1.0,-0.5,0.5,1.0",
+                                info="Comma-separated centers for spline features; leave empty to use defaults.",
                             )
                     with gr.Tab(label="Blocks"):
                         with gr.Row(visible=True):
@@ -2954,6 +2991,9 @@ def lora_tab(
                     unit,
                     lycoris_accordion,
                     loraplus,
+                    spline_gate,
+                    spline_scale,
+                    spline_centers,
                 ],
             )
 
@@ -3230,6 +3270,9 @@ def lora_tab(
             neon_training.neon_generation_batch_size,
             neon_training.neon_positive_prefix,
             neon_training.neon_negative_prompt,
+            spline_gate,
+            spline_scale,
+            spline_centers,
         ]
 
         configuration.button_open_config.click(
