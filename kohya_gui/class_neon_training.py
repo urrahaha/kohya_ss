@@ -95,7 +95,32 @@ class NeonTraining:
                             precision=0,
                             info="Steps for post-training (used if epochs=0, default: 100)"
                         )
+
+                with gr.Row():
+                    with gr.Column():
+                        self.neon_post_training_batch_size = gr.Number(
+                            label="Post-Training Batch Size",
+                            value=self.config.get("neon.post_training_batch_size", 1),
+                            minimum=1,
+                            precision=0,
+                            info="Optional override for Neon post-training dataloader batch size (empty = use training batch size)"
+                        )
                 
+                with gr.Row():
+                    with gr.Column():
+                        self.neon_use_diff2flow = gr.Checkbox(
+                            label="Use Diff2Flow in Aux Training (FM)",
+                            value=self.config.get("neon.use_diff2flow", False),
+                            info="Enable Diff2Flow when training the auxiliary model on synthetic data (uses FM trainer)."
+                        )
+                    with gr.Column():
+                        self.neon_d2f_param = gr.Dropdown(
+                            label="Aux parameterization",
+                            choices=["auto", "v", "eps"],
+                            value=self.config.get("neon.d2f_param", "auto"),
+                            info="Override UNet parameterization for Diff2Flow in aux training (auto = infer)."
+                        )
+
                 with gr.Row():
                     with gr.Column():
                         self.neon_synthetic_image_percent = gr.Slider(

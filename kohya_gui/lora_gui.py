@@ -4,6 +4,7 @@ import math
 import os
 import time
 import toml
+import inspect
 
 from datetime import datetime
 from .common_gui import (
@@ -327,6 +328,9 @@ def save_configuration(
     # SRPO parameters
     srpo_enable,
     srpo_use_reward_model,
+    # SRPO Diff2Flow bridge
+    srpo_use_diff2flow,
+    srpo_d2f_param,
     srpo_reward_model,
     srpo_timestep_length,
     srpo_discount_pos_start,
@@ -347,11 +351,17 @@ def save_configuration(
     neon_synthetic_dataset_dir,
     neon_post_training_epochs,
     neon_post_training_steps,
+    neon_post_training_batch_size,
     neon_synthetic_image_percent,
     neon_extrapolation_weight,
     neon_generation_batch_size,
     neon_positive_prefix,
     neon_negative_prompt,
+    neon_use_diff2flow,
+    neon_d2f_param,
+    spline_gate,
+    spline_scale,
+    spline_centers,
 ):
     # Get list of function parameters and values
     parameters = list(locals().items())
@@ -387,7 +397,7 @@ def save_configuration(
     SaveConfigFile(
         parameters=parameters,
         file_path=file_path,
-        exclusion=["file_path", "save_as"],
+        exclusion=["file_path", "save_as_bool"],
     )
 
     # Return the file path of the saved configuration
@@ -644,6 +654,8 @@ def open_configuration(
     # SRPO parameters
     srpo_enable,
     srpo_use_reward_model,
+    srpo_use_diff2flow,
+    srpo_d2f_param,
     srpo_reward_model,
     srpo_timestep_length,
     srpo_discount_pos_start,
@@ -664,11 +676,17 @@ def open_configuration(
     neon_synthetic_dataset_dir,
     neon_post_training_epochs,
     neon_post_training_steps,
+    neon_post_training_batch_size,
     neon_synthetic_image_percent,
     neon_extrapolation_weight,
     neon_generation_batch_size,
     neon_positive_prefix,
     neon_negative_prompt,
+    neon_use_diff2flow,
+    neon_d2f_param,
+    spline_gate,
+    spline_scale,
+    spline_centers,
     ##
     training_preset,
 ):
@@ -1051,6 +1069,8 @@ def train_model(
     # SRPO parameters
     srpo_enable,
     srpo_use_reward_model,
+    srpo_use_diff2flow,
+    srpo_d2f_param,
     srpo_reward_model,
     srpo_timestep_length,
     srpo_discount_pos_start,
@@ -1071,11 +1091,17 @@ def train_model(
     neon_synthetic_dataset_dir,
     neon_post_training_epochs,
     neon_post_training_steps,
+    neon_post_training_batch_size,
     neon_synthetic_image_percent,
     neon_extrapolation_weight,
     neon_generation_batch_size,
     neon_positive_prefix,
     neon_negative_prompt,
+    neon_use_diff2flow,
+    neon_d2f_param,
+    spline_gate,
+    spline_scale,
+    spline_centers,
 ):
     # Get list of function parameters and values
     parameters = list(locals().items())
@@ -1882,6 +1908,8 @@ def train_model(
         # SRPO parameters
         "srpo_enable": srpo_enable if srpo_enable else None,
         "srpo_use_reward_model": srpo_use_reward_model if srpo_enable else None,
+        "srpo_use_diff2flow": srpo_use_diff2flow if srpo_enable else None,
+        "srpo_d2f_param": (srpo_d2f_param if (srpo_enable and srpo_d2f_param and srpo_d2f_param != "auto") else None),
         "srpo_reward_model": srpo_reward_model if srpo_enable else None,
         "srpo_timestep_length": int(srpo_timestep_length) if srpo_enable else None,
         "srpo_discount_pos": [float(srpo_discount_pos_start), float(srpo_discount_pos_end)] if srpo_enable else None,
@@ -1899,11 +1927,14 @@ def train_model(
         "neon_synthetic_dataset_dir": neon_synthetic_dataset_dir if neon_enable else None,
         "neon_post_training_epochs": int(neon_post_training_epochs) if neon_enable else None,
         "neon_post_training_steps": int(neon_post_training_steps) if neon_enable else None,
+        "neon_post_training_batch_size": int(neon_post_training_batch_size) if (neon_enable and neon_post_training_batch_size not in (None, "")) else None,
         "neon_synthetic_image_percent": float(neon_synthetic_image_percent) if neon_enable else None,
         "neon_extrapolation_weight": float(neon_extrapolation_weight) if neon_enable else None,
         "neon_generation_batch_size": int(neon_generation_batch_size) if neon_enable else None,
         "neon_positive_prefix": neon_positive_prefix if neon_enable else None,
         "neon_negative_prompt": neon_negative_prompt if neon_enable else None,
+        "neon_use_diff2flow": neon_use_diff2flow if neon_enable else None,
+        "neon_d2f_param": (neon_d2f_param if (neon_enable and neon_d2f_param and neon_d2f_param != "auto") else None),
     }
 
     # Given dictionary `config_toml_data`
@@ -3245,6 +3276,8 @@ def lora_tab(
             # SRPO parameters
             srpo_training.srpo_enable,
             srpo_training.srpo_use_reward_model,
+            srpo_training.srpo_use_diff2flow,
+            srpo_training.srpo_d2f_param,
             srpo_training.srpo_reward_model,
             srpo_training.srpo_timestep_length,
             srpo_training.srpo_discount_pos_start,
@@ -3265,21 +3298,183 @@ def lora_tab(
             neon_training.neon_synthetic_dataset_dir,
             neon_training.neon_post_training_epochs,
             neon_training.neon_post_training_steps,
+            neon_training.neon_post_training_batch_size,
             neon_training.neon_synthetic_image_percent,
             neon_training.neon_extrapolation_weight,
             neon_training.neon_generation_batch_size,
             neon_training.neon_positive_prefix,
             neon_training.neon_negative_prompt,
+            neon_training.neon_use_diff2flow,
+            neon_training.neon_d2f_param,
             spline_gate,
             spline_scale,
             spline_centers,
         ]
 
+        # Validate that callback inputs match function signatures to catch unused/missing args early
+        def _verify_callback_arity(fn, inputs_list, name: str, inputs_names=None) -> None:
+            try:
+                sig = inspect.signature(fn)
+                expected = len(sig.parameters)
+            except Exception as e:
+                log.warning(f"[ArityCheck] Unable to inspect signature for {name}: {e}")
+                return
+            provided = len(inputs_list)
+            if provided == expected:
+                return
+            # Helpers
+            def _label_for(c):
+                try:
+                    label = getattr(c, "label", None)
+                    if label:
+                        return str(label)
+                    elem_id = getattr(c, "elem_id", None)
+                    if elem_id:
+                        return str(elem_id)
+                    return c.__class__.__name__
+                except Exception:
+                    return type(c).__name__
+
+            param_names = list(sig.parameters.keys())
+            # Window size for tail preview
+            k = 5
+            sig_tail = param_names[max(0, expected - k): expected]
+            ui_tail = [_label_for(c) for c in inputs_list[max(0, provided - k): provided]]
+
+            if provided > expected:
+                # Extra UI inputs beyond signature
+                extra_n = provided - expected
+                extras = inputs_list[-extra_n:]
+                extras_labels = [_label_for(c) for c in extras]
+                extras_names = None
+                if inputs_names and len(inputs_names) == provided:
+                    extras_names = inputs_names[-extra_n:]
+                msg = (
+                    f"[ArityCheck] {name}: function expects {expected} args, UI provides {provided}. "
+                    f"Extra UI inputs (tail) will be ignored: {extras_labels}."
+                )
+                log.info(msg)
+                if extras_names:
+                    log.info(f"[ArityCheck] {name}: extra input names: {extras_names}")
+                log.info(
+                    f"[ArityCheck] {name}: signature tail (last {len(sig_tail)}): {sig_tail}; "
+                    f"UI tail (last {len(ui_tail)}): {ui_tail}"
+                )
+                return
+
+            # Missing trailing parameters from signature
+            missing = param_names[provided:expected]
+            msg = (
+                f"[ArityCheck] {name}: function expects {expected} args, UI provides {provided}. "
+                f"Missing trailing params: {missing}"
+            )
+            log.warning(msg)
+            log.warning(
+                f"[ArityCheck] {name}: signature tail (last {len(sig_tail)}): {sig_tail}; "
+                f"UI tail (last {len(ui_tail)}): {ui_tail}"
+            )
+
+        # Verify by-name alignment and ordering between a function signature and the provided input names
+        def _verify_name_alignment(fn, inputs_names, name: str) -> None:
+            if not inputs_names:
+                return
+            try:
+                sig = inspect.signature(fn)
+                param_names = list(sig.parameters.keys())
+            except Exception as e:
+                log.warning(f"[NameCheck] Unable to inspect signature for {name}: {e}")
+                return
+
+            # Basic set differences
+            missing_names = [n for n in param_names if n not in inputs_names]
+            extra_names = [n for n in inputs_names if n not in param_names]
+            if missing_names:
+                log.warning(f"[NameCheck] {name}: missing parameters by name: {missing_names}")
+            if extra_names:
+                log.warning(f"[NameCheck] {name}: extra input names not in signature: {extra_names}")
+
+            # Detect first ordering mismatch among common names
+            common_sig = [n for n in param_names if n in inputs_names]
+            common_inputs = [n for n in inputs_names if n in param_names]
+            mismatch_idx = None
+            for i in range(min(len(common_sig), len(common_inputs))):
+                if common_sig[i] != common_inputs[i]:
+                    mismatch_idx = i
+                    break
+            if mismatch_idx is not None:
+                k = 3
+                sig_window_start = max(0, mismatch_idx - k)
+                inp_window_start = max(0, mismatch_idx - k)
+                sig_window = common_sig[sig_window_start : mismatch_idx + k + 1]
+                inp_window = common_inputs[inp_window_start : mismatch_idx + k + 1]
+                log.warning(
+                    f"[NameCheck] {name}: order mismatch at index {mismatch_idx}: "
+                    f"signature='{common_sig[mismatch_idx]}', input='{common_inputs[mismatch_idx]}'"
+                )
+                log.warning(
+                    f"[NameCheck] {name}: around mismatch — signature: {sig_window}; inputs: {inp_window}"
+                )
+
+        # Helper to wrap callbacks and gracefully drop any extra inputs beyond the function signature
+        def _wrap_by_signature(fn, name: str):
+            sig_len = len(inspect.signature(fn).parameters)
+            def _cb(*args):
+                provided = len(args)
+                if provided > sig_len:
+                    log.warning(f"[ArityAdapter] {name}: dropping {provided - sig_len} extra input(s)")
+                    return fn(*args[:sig_len])
+                if provided < sig_len:
+                    log.error(f"[ArityAdapter] {name}: expects {sig_len} args, got {provided}")
+                    return
+                return fn(*args)
+            return _cb
+
+        # Construct the exact input lists used by callbacks so the arity check is automatic
+        oc_inputs_open = [dummy_db_true, dummy_db_false, configuration.config_file_name] + settings_list + [training_preset]
+        oc_inputs_load = [dummy_db_false, dummy_db_false, configuration.config_file_name] + settings_list + [training_preset]
+        oc_inputs_preset = [dummy_db_false, dummy_db_true, configuration.config_file_name] + settings_list + [training_preset]
+        sc_inputs = [dummy_db_false, configuration.config_file_name] + settings_list
+        tm_inputs_run = [dummy_headless] + [dummy_db_false] + settings_list
+        tm_inputs_print = [dummy_headless] + [dummy_db_true] + settings_list
+
+        # Build parallel input-name arrays for precise diagnostics
+        try:
+            sc_sig = inspect.signature(save_configuration)
+            sc_param_names = list(sc_sig.parameters.keys())
+            settings_param_names = sc_param_names[2:]
+        except Exception:
+            settings_param_names = []
+
+        oc_inputs_open_names = ["ask_for_file", "apply_preset", "file_path"] + settings_param_names + ["training_preset"]
+        oc_inputs_load_names = ["ask_for_file", "apply_preset", "file_path"] + settings_param_names + ["training_preset"]
+        oc_inputs_preset_names = ["ask_for_file", "apply_preset", "file_path"] + settings_param_names + ["training_preset"]
+        sc_inputs_names = ["save_as_bool", "file_path"] + settings_param_names
+        tm_inputs_run_names = ["headless", "print_only"] + settings_param_names
+        tm_inputs_print_names = ["headless", "print_only"] + settings_param_names
+
+        _verify_callback_arity(open_configuration, oc_inputs_open, name="open_configuration(open)", inputs_names=oc_inputs_open_names)
+        _verify_callback_arity(open_configuration, oc_inputs_load, name="open_configuration(load)", inputs_names=oc_inputs_load_names)
+        _verify_callback_arity(open_configuration, oc_inputs_preset, name="open_configuration(preset)", inputs_names=oc_inputs_preset_names)
+        _verify_callback_arity(save_configuration, sc_inputs, name="save_configuration", inputs_names=sc_inputs_names)
+        _verify_callback_arity(train_model, tm_inputs_run, name="train_model(run)", inputs_names=tm_inputs_run_names)
+        _verify_callback_arity(train_model, tm_inputs_print, name="train_model(print)", inputs_names=tm_inputs_print_names)
+
+        # Verify name alignment and ordering as a second layer of diagnostics
+        _verify_name_alignment(open_configuration, oc_inputs_open_names, name="open_configuration(open)")
+        _verify_name_alignment(open_configuration, oc_inputs_load_names, name="open_configuration(load)")
+        _verify_name_alignment(open_configuration, oc_inputs_preset_names, name="open_configuration(preset)")
+        _verify_name_alignment(save_configuration, sc_inputs_names, name="save_configuration")
+        _verify_name_alignment(train_model, tm_inputs_run_names, name="train_model(run)")
+        _verify_name_alignment(train_model, tm_inputs_print_names, name="train_model(print)")
+
+        # Build wrapped callbacks
+        oc_cb = _wrap_by_signature(open_configuration, "open_configuration")
+        sc_cb = _wrap_by_signature(save_configuration, "save_configuration")
+        tm_cb = _wrap_by_signature(train_model, "train_model")
+
         configuration.button_open_config.click(
-            open_configuration,
-            inputs=[dummy_db_true, dummy_db_false, configuration.config_file_name]
-            + settings_list
-            + [training_preset],
+            oc_cb,
+            inputs=oc_inputs_open,
             outputs=[configuration.config_file_name]
             + settings_list
             + [training_preset, convolution_row],
@@ -3287,10 +3482,8 @@ def lora_tab(
         )
 
         configuration.button_load_config.click(
-            open_configuration,
-            inputs=[dummy_db_false, dummy_db_false, configuration.config_file_name]
-            + settings_list
-            + [training_preset],
+            oc_cb,
+            inputs=oc_inputs_load,
             outputs=[configuration.config_file_name]
             + settings_list
             + [training_preset, convolution_row],
@@ -3298,10 +3491,8 @@ def lora_tab(
         )
 
         training_preset.input(
-            open_configuration,
-            inputs=[dummy_db_false, dummy_db_true, configuration.config_file_name]
-            + settings_list
-            + [training_preset],
+            oc_cb,
+            inputs=oc_inputs_preset,
             outputs=[gr.Textbox(visible=False)]
             + settings_list
             + [training_preset, convolution_row],
@@ -3309,8 +3500,8 @@ def lora_tab(
         )
 
         configuration.button_save_config.click(
-            save_configuration,
-            inputs=[dummy_db_false, configuration.config_file_name] + settings_list,
+            sc_cb,
+            inputs=sc_inputs,
             outputs=[configuration.config_file_name],
             show_progress=False,
         )
@@ -3323,8 +3514,8 @@ def lora_tab(
         )
 
         executor.button_run.click(
-            train_model,
-            inputs=[dummy_headless] + [dummy_db_false] + settings_list,
+            tm_cb,
+            inputs=tm_inputs_run,
             outputs=[executor.button_run, executor.button_stop_training, run_state],
             show_progress=False,
         )
@@ -3335,8 +3526,8 @@ def lora_tab(
         )
 
         button_print.click(
-            train_model,
-            inputs=[dummy_headless] + [dummy_db_true] + settings_list,
+            tm_cb,
+            inputs=tm_inputs_print,
             show_progress=False,
         )
 

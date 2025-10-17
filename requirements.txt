@@ -34,5 +34,6 @@ toml==0.10.2
 transformers==4.44.2
 voluptuous==0.13.1
 wandb==0.18.0
+hpsv2
 # for kohya_ss sd-scripts library
 -e ./sd-scripts

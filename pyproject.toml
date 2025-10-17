@@ -52,6 +52,7 @@ dependencies = [
     "voluptuous==0.13.1",
     "wandb==0.18.0",
     "xformers>=0.0.30",
+    "hpsv2",
 ]
 
 [tool.uv.sources]

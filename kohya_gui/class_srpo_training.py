@@ -68,6 +68,21 @@ class SRPOTraining:
                         value=self.config.get("srpo.use_reward_model", True),
                         info="Enable reward-based guidance. ⚠️ DISABLE for anime/illustration - existing models are biased toward photorealism"
                     )
+
+            with gr.Row():
+                with gr.Column():
+                    self.srpo_use_diff2flow = gr.Checkbox(
+                        label="SRPO Diff2Flow bridge (v→ε)",
+                        value=self.config.get("srpo.use_diff2flow", False),
+                        info="If UNet is v-parameterized, convert v to epsilon before SRPO one-step update."
+                    )
+                with gr.Column():
+                    self.srpo_d2f_param = gr.Dropdown(
+                        label="SRPO parameterization",
+                        choices=["auto", "v", "eps"],
+                        value=self.config.get("srpo.d2f_param", "auto"),
+                        info="Override UNet parameterization for Diff2Flow bridge (auto = infer)."
+                    )
         
             with gr.Row():
                 with gr.Column():
