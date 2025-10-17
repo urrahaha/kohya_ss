@@ -1938,11 +1938,16 @@ def train_model(
     }
 
     # Given dictionary `config_toml_data`
-    # Remove all values = ""
+    # Remove empty values while preserving explicit False overrides for selected keys
+    preserve_false_keys = set()
+    if srpo_enable and srpo_use_reward_model is False:
+        preserve_false_keys.add("srpo_use_reward_model")
+
     config_toml_data = {
         key: value
         for key, value in config_toml_data.items()
-        if value not in ["", False, None]
+        if value not in ["", None]
+        and not (value is False and key not in preserve_false_keys)
     }
 
     config_toml_data["max_data_loader_n_workers"] = int(max_data_loader_n_workers)
