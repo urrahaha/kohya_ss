@@ -9,7 +9,7 @@ wd14_tagger_model
 
 # IDE and Editor specific
 .vscode
-.idea/
+.idea
 
 # CUDNN for Windows
 cudnn_windows
