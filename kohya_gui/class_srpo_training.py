@@ -186,14 +186,22 @@ class SRPOTraining:
                 
                 with gr.Row():
                     with gr.Column():
-                        gr.Markdown("**Training Timestep Range**")
+                        gr.Markdown("**Training Timestep Window**")
+                        default_mode = self.config.get("srpo.train_timestep_mode", "percentage")
+                        self.srpo_train_timestep_mode = gr.Dropdown(
+                            label="Timestep Mode",
+                            choices=["absolute", "percentage"],
+                            value=default_mode,
+                            info="Choose absolute timesteps or percentage window so settings stay consistent when you change timestep length."
+                        )
                         self.srpo_train_timestep_start = gr.Slider(
                             label="Start Timestep",
                             value=self.config.get("srpo.train_timestep_start", 5),
                             minimum=0,
                             maximum=50,
                             step=1,
-                            info="Start of training timestep range (default: 5)"
+                            info="Start of training timestep range (default: 5)",
+                            visible=default_mode == "absolute"
                         )
                         self.srpo_train_timestep_end = gr.Slider(
                             label="End Timestep",
@@ -201,7 +209,47 @@ class SRPOTraining:
                             minimum=0,
                             maximum=100,
                             step=1,
-                            info="End of training timestep range (default: 25)"
+                            info="End of training timestep range (default: 25)",
+                            visible=default_mode == "absolute"
+                        )
+                        self.srpo_train_timestep_start_pct = gr.Slider(
+                            label="Start (%)",
+                            value=self.config.get("srpo.train_timestep_start_pct", 0.15),
+                            minimum=0.0,
+                            maximum=1.0,
+                            step=0.01,
+                            info="Lower bound as fraction of total steps (default: 0.15)",
+                            visible=default_mode != "absolute"
+                        )
+                        self.srpo_train_timestep_end_pct = gr.Slider(
+                            label="End (%)",
+                            value=self.config.get("srpo.train_timestep_end_pct", 0.6),
+                            minimum=0.0,
+                            maximum=1.0,
+                            step=0.01,
+                            info="Upper bound as fraction of total steps (default: 0.6)",
+                            visible=default_mode != "absolute"
+                        )
+
+                        def _set_srpo_timestep_visibility(mode):
+                            show_absolute = mode == "absolute"
+                            show_pct = mode == "percentage"
+                            return (
+                                gr.update(visible=show_absolute),
+                                gr.update(visible=show_absolute),
+                                gr.update(visible=show_pct),
+                                gr.update(visible=show_pct),
+                            )
+
+                        self.srpo_train_timestep_mode.change(
+                            _set_srpo_timestep_visibility,
+                            inputs=[self.srpo_train_timestep_mode],
+                            outputs=[
+                                self.srpo_train_timestep_start,
+                                self.srpo_train_timestep_end,
+                                self.srpo_train_timestep_start_pct,
+                                self.srpo_train_timestep_end_pct,
+                            ],
                         )
             
             with gr.Accordion("Custom Control Words (Style Preference)", open=False):

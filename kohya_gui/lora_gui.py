@@ -337,8 +337,11 @@ def save_configuration(
     srpo_discount_pos_end,
     srpo_discount_inv_start,
     srpo_discount_inv_end,
+    srpo_train_timestep_mode,
     srpo_train_timestep_start,
     srpo_train_timestep_end,
+    srpo_train_timestep_start_pct,
+    srpo_train_timestep_end_pct,
     srpo_groundtruth_ratio,
     srpo_guidance_scale,
     srpo_reward_threshold,
@@ -662,8 +665,11 @@ def open_configuration(
     srpo_discount_pos_end,
     srpo_discount_inv_start,
     srpo_discount_inv_end,
+    srpo_train_timestep_mode,
     srpo_train_timestep_start,
     srpo_train_timestep_end,
+    srpo_train_timestep_start_pct,
+    srpo_train_timestep_end_pct,
     srpo_groundtruth_ratio,
     srpo_guidance_scale,
     srpo_reward_threshold,
@@ -1077,8 +1083,11 @@ def train_model(
     srpo_discount_pos_end,
     srpo_discount_inv_start,
     srpo_discount_inv_end,
+    srpo_train_timestep_mode,
     srpo_train_timestep_start,
     srpo_train_timestep_end,
+    srpo_train_timestep_start_pct,
+    srpo_train_timestep_end_pct,
     srpo_groundtruth_ratio,
     srpo_guidance_scale,
     srpo_reward_threshold,
@@ -1914,7 +1923,17 @@ def train_model(
         "srpo_timestep_length": int(srpo_timestep_length) if srpo_enable else None,
         "srpo_discount_pos": [float(srpo_discount_pos_start), float(srpo_discount_pos_end)] if srpo_enable else None,
         "srpo_discount_inv": [float(srpo_discount_inv_start), float(srpo_discount_inv_end)] if srpo_enable else None,
-        "srpo_train_timestep": [int(srpo_train_timestep_start), int(srpo_train_timestep_end)] if srpo_enable else None,
+        "srpo_train_timestep_mode": srpo_train_timestep_mode if srpo_enable else None,
+        "srpo_train_timestep": (
+            [int(srpo_train_timestep_start), int(srpo_train_timestep_end)]
+            if srpo_enable and srpo_train_timestep_mode == "absolute"
+            else None
+        ),
+        "srpo_train_timestep_pct": (
+            [float(srpo_train_timestep_start_pct), float(srpo_train_timestep_end_pct)]
+            if srpo_enable and srpo_train_timestep_mode == "percentage"
+            else None
+        ),
         "srpo_groundtruth_ratio": float(srpo_groundtruth_ratio) if srpo_enable else None,
         "srpo_guidance_scale": float(srpo_guidance_scale) if srpo_enable else None,
         "srpo_reward_threshold": float(srpo_reward_threshold) if srpo_enable else None,
@@ -3289,8 +3308,11 @@ def lora_tab(
             srpo_training.srpo_discount_pos_end,
             srpo_training.srpo_discount_inv_start,
             srpo_training.srpo_discount_inv_end,
+            srpo_training.srpo_train_timestep_mode,
             srpo_training.srpo_train_timestep_start,
             srpo_training.srpo_train_timestep_end,
+            srpo_training.srpo_train_timestep_start_pct,
+            srpo_training.srpo_train_timestep_end_pct,
             srpo_training.srpo_groundtruth_ratio,
             srpo_training.srpo_guidance_scale,
             srpo_training.srpo_reward_threshold,
