@@ -62,3 +62,4 @@ sd-scripts
 venv
 venv*
 .python-version
+/.idea/
