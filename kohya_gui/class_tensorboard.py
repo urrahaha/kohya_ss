@@ -5,8 +5,11 @@ import time
 import webbrowser
 
 try:
-    os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-    import tensorflow  # Attempt to import tensorflow to check if it is installed
+    # os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+    # import tensorflow  # Attempt to import tensorflow to check if it is installed
+    
+    # we only need tensorboard!!
+    import tensorboard
 
     visibility = True
 except ImportError:
