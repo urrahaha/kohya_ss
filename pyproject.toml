@@ -53,6 +53,7 @@ dependencies = [
     "wandb==0.18.0",
     "xformers>=0.0.30",
     "hpsv2",
+    "peft @ git+https://github.com/huggingface/peft"
 ]
 
 [tool.uv.sources]

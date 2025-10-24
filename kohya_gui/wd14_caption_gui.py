@@ -40,6 +40,7 @@ def caption_images(
     use_rating_tags_as_last_tag: bool,
     remove_underscore: bool,
     thresh: float,
+    model_dir: str,
 ) -> None:
     # Check for images_dir_input
     if train_data_dir == "":
@@ -50,8 +51,13 @@ def caption_images(
         log.info("Please provide an extension for the caption files.")
         return
 
+    # Use model_dir if provided, otherwise use default
+    if not model_dir:
+        model_dir = "./wd14_tagger_model"
+    
     repo_id_converted = repo_id.replace("/", "_")
-    if not os.path.exists(f"./wd14_tagger_model/{repo_id_converted}"):
+    model_location = os.path.join(model_dir, repo_id_converted)
+    if not os.path.exists(model_location):
         force_download = True
 
     log.info(f"Captioning files in {train_data_dir}...")
@@ -91,6 +97,9 @@ def caption_images(
         run_cmd.append(str(general_threshold))
     run_cmd.append("--max_data_loader_n_workers")
     run_cmd.append(str(int(max_data_loader_n_workers)))
+    if model_dir:
+        run_cmd.append("--model_dir")
+        run_cmd.append(model_dir)
 
     if onnx:
         run_cmd.append("--onnx")
@@ -206,6 +215,7 @@ def gradio_wd14_caption_gui_tab(
                     "SmilingWolf/wd-swinv2-tagger-v3",
                     "SmilingWolf/wd-vit-tagger-v3",
                     "SmilingWolf/wd-convnext-tagger-v3",
+                    "SmilingWolf/wd-vit-large-tagger-v3",
                 ],
                 value=config.get(
                     "wd14_caption.repo_id", "SmilingWolf/wd-v1-4-convnextv2-tagger-v2"
@@ -217,6 +227,25 @@ def gradio_wd14_caption_gui_tab(
                 label="Force model re-download",
                 value=config.get("wd14_caption.force_download", False),
                 info="Useful to force model re download when switching to onnx",
+            )
+
+        with gr.Group(), gr.Row():
+            model_dir = gr.Textbox(
+                label="Model directory",
+                placeholder="(Optional) Directory to save/load models (default: ./wd14_tagger_model)",
+                value=config.get("wd14_caption.model_dir", ""),
+                interactive=True,
+            )
+            button_model_dir = gr.Button(
+                "📂",
+                elem_id="open_folder_small",
+                elem_classes=["tool"],
+                visible=(not headless),
+            )
+            button_model_dir.click(
+                get_folder_path,
+                outputs=model_dir,
+                show_progress=False,
             )
 
         with gr.Row():
@@ -396,6 +425,7 @@ def gradio_wd14_caption_gui_tab(
                 use_rating_tags_as_last_tag,
                 remove_underscore,
                 thresh,
+                model_dir,
             ],
             show_progress=False,
         )

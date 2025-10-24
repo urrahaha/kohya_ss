@@ -961,6 +961,7 @@ dependencies = [
     { name = "onnxruntime-gpu" },
     { name = "open-clip-torch" },
     { name = "opencv-python" },
+    { name = "peft" },
     { name = "pip" },
     { name = "prodigy-plus-schedule-free" },
     { name = "prodigyopt" },
@@ -1016,6 +1017,7 @@ requires-dist = [
     { name = "onnxruntime-gpu", specifier = "==1.19.2" },
     { name = "open-clip-torch", specifier = "==2.20.0" },
     { name = "opencv-python", specifier = "==4.10.0.84" },
+    { name = "peft", git = "https://github.com/huggingface/peft" },
     { name = "pip" },
     { name = "prodigy-plus-schedule-free", specifier = ">=2.0.0rc2" },
     { name = "prodigyopt", specifier = "==1.1.2" },
@@ -1649,6 +1651,24 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/23/82/e6b85f0d92e9afb0e7f705a51d1399b79c7380c19687bfbf3d2837743249/pandas-2.3.2-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:e190b738675a73b581736cc8ec71ae113d6c3768d0bd18bffa5b9a0927b0b6ea", size = 13225600, upload-time = "2025-08-21T10:27:07.791Z" },
     { url = "https://files.pythonhosted.org/packages/e8/f1/f682015893d9ed51611948bd83683670842286a8edd4f68c2c1c3b231eef/pandas-2.3.2-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:c253828cb08f47488d60f43c5fc95114c771bbfff085da54bfc79cb4f9e3a372", size = 13879433, upload-time = "2025-08-21T10:27:10.347Z" },
     { url = "https://files.pythonhosted.org/packages/a7/e7/ae86261695b6c8a36d6a4c8d5f9b9ede8248510d689a2f379a18354b37d7/pandas-2.3.2-cp311-cp311-win_amd64.whl", hash = "sha256:9467697b8083f9667b212633ad6aa4ab32436dcbaf4cd57325debb0ddef2012f", size = 11336557, upload-time = "2025-08-21T10:27:12.983Z" },
+]
+
+[[package]]
+name = "peft"
+version = "0.17.2.dev0"
+source = { git = "https://github.com/huggingface/peft#a1056cf046aea293bed88ec7aea00ea6ad23680e" }
+dependencies = [
+    { name = "accelerate" },
+    { name = "huggingface-hub" },
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "psutil" },
+    { name = "pyyaml" },
+    { name = "safetensors" },
+    { name = "torch", version = "2.8.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux' and sys_platform != 'win32'" },
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { name = "tqdm" },
+    { name = "transformers" },
 ]
 
 [[package]]

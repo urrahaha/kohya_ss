@@ -1,3 +1,4 @@
+from typing import Any, Optional
 import gradio as gr
 import json
 import math
@@ -52,6 +53,7 @@ from .dreambooth_folder_creation_gui import (
 from .dataset_balancing_gui import gradio_dataset_balancing_tab
 
 from .custom_logging import setup_logging
+from .peft_utils import list_peft_tuners, default_peft_config_json, peft_help_markdown
 
 # Set up logging
 log = setup_logging()
@@ -365,6 +367,9 @@ def save_configuration(
     spline_gate,
     spline_scale,
     spline_centers,
+    # PEFT controls
+    peft_tuner,
+    peft_config_json,
 ):
     # Get list of function parameters and values
     parameters = list(locals().items())
@@ -693,6 +698,9 @@ def open_configuration(
     spline_gate,
     spline_scale,
     spline_centers,
+    # PEFT controls
+    peft_tuner,
+    peft_config_json,
     ##
     training_preset,
 ):
@@ -764,6 +772,8 @@ def open_configuration(
         values.append(gr.Row(visible=True))
     else:
         values.append(gr.Row(visible=False))
+        # Open the Parameters accordion to ensure UI elements are realized on first load
+        values.append(gr.update(open=True))
 
     return tuple(values)
 
@@ -1111,6 +1121,9 @@ def train_model(
     spline_gate,
     spline_scale,
     spline_centers,
+    # PEFT controls
+    peft_tuner,
+    peft_config_json,
 ):
     # Get list of function parameters and values
     parameters = list(locals().items())
@@ -1484,6 +1497,11 @@ def train_model(
         if train_t5xxl and flux1_checkbox:
             kohya_lora_vars["train_t5xxl"] = True
 
+        # Do not pass PEFT metadata via CLI args; only persist in saved config
+        if LoRA_type == "PEFT":
+            kohya_lora_vars.pop("peft_tuner", None)
+            kohya_lora_vars.pop("peft_config_json", None)
+
         for key, value in kohya_lora_vars.items():
             if value:
                 network_args += f" {key}={value}"
@@ -1515,7 +1533,7 @@ def train_model(
             if value:
                 network_args += f" {key}={value}"
 
-    if LoRA_type in ["Kohya LoCon", "Standard", "NLoRA", "AuroRA"]:
+    if LoRA_type in ["Kohya LoCon", "Standard", "NLoRA", "AuroRA", "PEFT"]:
         kohya_lora_var_list = [
             "down_lr_weight",
             "mid_lr_weight",
@@ -1535,6 +1553,8 @@ def train_model(
             network_module = "networks.nlora"
         elif LoRA_type == "AuroRA":
             network_module = "networks.aurora"
+        elif LoRA_type == "PEFT":
+            network_module = "networks.peft_generic"
         else:
             network_module = "networks.lora_sd3" if sd3_checkbox else "networks.lora"
         kohya_lora_vars = {
@@ -1542,6 +1562,73 @@ def train_model(
             for key, value in vars().items()
             if key in kohya_lora_var_list and value
         }
+
+        # Attach PEFT selections: persist + pass to backend via base64 JSON
+        if LoRA_type == "PEFT":
+            try:
+                kohya_lora_vars["peft_tuner"] = peft_tuner
+                # Normalize and validate JSON; fix common shorthand and ensure minimal defaults
+                norm_dict: dict[str, Any]
+                try:
+                    norm_dict = json.loads(peft_config_json or "{}") if peft_config_json else {}
+                except Exception as e:
+                    log.warning(f"Invalid PEFT config JSON provided; falling back to defaults: {e}")
+                    norm_dict = {}
+
+                # Inject base_model_name_or_path from pretrained_model_name_or_path if not set
+                try:
+                    pm = pretrained_model_name_or_path
+                    if pm and not norm_dict.get("base_model_name_or_path"):
+                        norm_dict["base_model_name_or_path"] = pm
+                except Exception:
+                    pass
+
+                tm = norm_dict.get("target_modules")
+                tm_str: Optional[str] = None
+                tm_list: list[str] = []
+                if isinstance(tm, str):
+                    tm_str = tm.strip()
+                elif isinstance(tm, (list, set, tuple)):
+                    tm_list = [str(x).strip() for x in tm if str(x).strip()]
+                    if len(tm_list) == 1 and tm_list[0].lower() == "all-linear":
+                        tm_str = "all-linear"
+                if tm_str is not None:
+                    norm_dict["target_modules"] = tm_str
+                else:
+                    if not tm_list:
+                        # Default to all-linear if nothing specified
+                        tm_str = "all-linear"
+                        norm_dict["target_modules"] = tm_str
+                    else:
+                        norm_dict["target_modules"] = tm_list
+
+                # If using shorthand string, drop mutually exclusive fields unconditionally
+                if isinstance(norm_dict.get("target_modules"), str) and norm_dict["target_modules"].lower() == "all-linear":
+                    if "layers_to_transform" in norm_dict:
+                        log.warning("Removing layers_to_transform because target_modules uses 'all-linear'.")
+                        norm_dict.pop("layers_to_transform", None)
+                    if "layers_pattern" in norm_dict:
+                        log.warning("Removing layers_pattern because target_modules uses 'all-linear'.")
+                        norm_dict.pop("layers_pattern", None)
+
+                # Ensure modules_to_save is a list (PEFT expects list or None)
+                mts = norm_dict.get("modules_to_save")
+                if isinstance(mts, str):
+                    norm_dict["modules_to_save"] = [m.strip() for m in mts.split(",") if m.strip()]
+
+                norm_json = json.dumps(norm_dict, indent=2, sort_keys=True)
+                kohya_lora_vars["peft_config_json"] = norm_json
+
+                if not norm_dict.get("target_modules"):
+                    log.warning("PEFT config has no target_modules specified; defaulting to 'all-linear'.")
+
+                # Append CLI network_args for backend consumption
+                import base64
+
+                cfg_b64 = base64.urlsafe_b64encode(norm_json.encode("utf-8")).decode("ascii")
+                network_args += f" peft_tuner={peft_tuner} peft_cfg_b64={cfg_b64}"
+            except Exception as e:
+                log.warning(f"PEFT args build failed: {e}")
 
         # Not sure if Flux1 is Standard... or LoCon style... flip a coin... going for LoCon style...
         if LoRA_type in ["Kohya LoCon"]:
@@ -1786,7 +1873,12 @@ def train_model(
             else None
         ),
         "network_alpha": network_alpha,
-        "network_args": str(network_args).replace('"', "").split(),
+        # Ensure only well-formed key=value tokens are passed to backend
+        "network_args": [
+            tok
+            for tok in str(network_args).replace('"', "").split()
+            if "=" in tok
+        ],
         "network_dim": network_dim,
         "network_dropout": network_dropout,
         "network_module": network_module,
@@ -2088,7 +2180,7 @@ def lora_tab(
 
             gradio_dataset_balancing_tab(headless=headless)
 
-        with gr.Accordion("Parameters", open=False), gr.Column():
+        with gr.Accordion("Parameters", open=False) as parameters_acc, gr.Column():
 
             def list_presets(path):
                 json_files = []
@@ -2138,10 +2230,12 @@ def lora_tab(
                             "LyCORIS/Native Fine-Tuning",
                             "NLoRA",
                             "AuroRA",
+                            "PEFT",
                             "Standard",
                         ],
                         value="Standard",
                     )
+
                     LyCORIS_preset = gr.Dropdown(
                         label="LyCORIS Preset",
                         choices=LYCORIS_PRESETS_CHOICES,
@@ -2151,6 +2245,7 @@ def lora_tab(
                         allow_custom_value=True,
                         info="Use path_to_config_file.toml to choose config file (for LyCORIS module settings)",
                     )
+                            
                     with gr.Group():
                         with gr.Row():
                             network_weights = gr.Textbox(
@@ -2175,6 +2270,35 @@ def lora_tab(
                                 value=False,
                                 info="Automatically determine the dim(rank) from the weight file.",
                             )
+
+                peft_help_acc = gr.Accordion("PEFT help", open=False, visible=False)
+                with peft_help_acc:
+                    with gr.Row():
+                        # Keep Markdown here and prefer Gradio's built-in max_height for scrolling
+                        peft_help = gr.Markdown(visible=False, max_height=320)
+
+                with gr.Row(visible=False) as peft_row:
+                    with gr.Row(equal_height=True):
+                        with gr.Column():
+                            # PEFT tuner controls (visible only when LoRA_type == "PEFT")
+                            peft_tuner = gr.Dropdown(
+                                label="PEFT tuner",
+                                choices=(tuners := list_peft_tuners()) or ["(peft not available)"]
+                            )
+                            if list_peft_tuners():
+                                peft_tuner.value = "Lora" if "Lora" in list_peft_tuners() else list_peft_tuners()[0]
+                            peft_load_defaults = gr.Button("Load defaults")
+
+                        with gr.Column():
+                            peft_config_json = gr.Textbox(
+                                label="PEFT config (JSON)",
+                                value=default_peft_config_json(peft_tuner.value, include_optionals=True) if list_peft_tuners() else "{}",
+                                visible=False,
+                            )
+
+                # Removed auto-generated PEFT parameters section; rely on JSON + help only.
+
+
                 basic_training = BasicTraining(
                     learning_rate_value=0.0001,
                     lr_scheduler_value="cosine",
@@ -2455,6 +2579,7 @@ def lora_tab(
                                     "NLoRA",
                                     "AuroRA",
                                     "Standard",
+                                    "PEFT",
                                 },
                             },
                         },
@@ -2514,6 +2639,7 @@ def lora_tab(
                                     "LyCORIS/LoHa",
                                     "LyCORIS/LoKr",
                                     "LyCORIS/LoCon",
+                                    "PEFT",
                                 },
                             },
                         },
@@ -2538,6 +2664,7 @@ def lora_tab(
                                     "LyCORIS/LoHa",
                                     "LyCORIS/LoCon",
                                     "LyCORIS/LoKr",
+                                    "PEFT",
                                 },
                             },
                         },
@@ -2562,6 +2689,7 @@ def lora_tab(
                                     "LyCORIS/LoHa",
                                     "LyCORIS/LoCon",
                                     "LyCORIS/LoKr",
+                                    "PEFT",
                                 }
                             },
                         },
@@ -2743,6 +2871,7 @@ def lora_tab(
                                     "NLoRA",
                                     "AuroRA",
                                     "Standard",
+                                    "PEFT",
                                 },
                             },
                         },
@@ -2766,6 +2895,7 @@ def lora_tab(
                                     "NLoRA",
                                     "AuroRA",
                                     "Standard",
+                                    "PEFT",
                                 },
                             },
                         },
@@ -2788,6 +2918,7 @@ def lora_tab(
                                     "LyCORIS/Native Fine-Tuning",
                                     "AuroRA",
                                     "Standard",
+                                    "PEFT",
                                 },
                             },
                         },
@@ -2810,6 +2941,7 @@ def lora_tab(
                                     "LoRA-FA",
                                     "AuroRA",
                                     "Standard",
+                                    "PEFT",
                                 },
                             },
                         },
@@ -2876,6 +3008,7 @@ def lora_tab(
                                     "LyCORIS/Native Fine-Tuning",
                                     "AuroRA",
                                     "Standard",
+                                    "PEFT",
                                 },
                             },
                         },
@@ -2897,6 +3030,31 @@ def lora_tab(
                                 "visible": LoRA_type in {"AuroRA"},
                             },
                         },
+                        "peft_row": {
+                            "gr_type": gr.Row,
+                            "update_params": {
+                                "visible": LoRA_type in {"PEFT"},
+                            },
+                        },
+                        "peft_help_acc": {
+                            "gr_type": gr.Accordion,
+                            "update_params": {
+                                "visible": LoRA_type in {"PEFT"},
+                            },
+                        },
+                        "peft_config_json": {
+                            "gr_type": gr.Textbox,
+                            "update_params": {
+                                "visible": LoRA_type in {"PEFT"},
+                            },
+                        },
+                        "peft_help": {
+                            "gr_type": gr.Markdown,
+                            "update_params": {
+                                "visible": LoRA_type in {"PEFT"},
+                            },
+                        },
+                        # auto-generated PEFT form removed
                     }
 
                     results = []
@@ -3010,6 +3168,7 @@ def lora_tab(
             ):
                 huggingface = HuggingFace(config=config)
             
+            # Update visibility for LoRA type-specific sections
             LoRA_type.change(
                 update_LoRA_settings,
                 inputs=[
@@ -3049,8 +3208,277 @@ def lora_tab(
                     spline_gate,
                     spline_scale,
                     spline_centers,
+                    peft_row,
+                    peft_help_acc,
+                    peft_config_json,
+                    peft_help,
                 ],
             )
+
+            # Fill defaults when tuner changes or on button click
+            def _peft_defaults_and_form(name: str, current_json: str = ""):
+                import json
+                # If current_json already has content, keep it and mirror into simple fields
+                try:
+                    d_cur = json.loads(current_json or "{}")
+                except Exception:
+                    d_cur = {}
+                if isinstance(d_cur, dict) and len(d_cur) > 0:
+                    help_md = peft_help_markdown(name)
+                    # Return the unchanged JSON and derived simple fields
+                    return (
+                        json.dumps(d_cur, indent=2, sort_keys=True),
+                        gr.update(value=help_md, visible=bool(help_md)),
+                    )
+                # Otherwise, load defaults for this tuner
+                try:
+                    cfg = default_peft_config_json(name, include_optionals=True)
+                    d = json.loads(cfg)
+                except Exception:
+                    cfg, d = "{}", {}
+                help_md = peft_help_markdown(name)
+                return cfg, gr.update(value=help_md, visible=bool(help_md))
+
+            peft_tuner.change(
+                _peft_defaults_and_form,
+                inputs=[peft_tuner, peft_config_json],
+                outputs=[
+                    peft_config_json,
+                    peft_help,
+                ],
+            )
+            def _peft_build_generated_form(name: str):
+                # auto-generated PEFT form removed
+                pass
+                label_updates = []
+                dropdown_updates = []
+                check_updates = []
+                number_updates = []
+                text_updates = []
+                for i in range(PF_MAX):
+                    if i < len(schema):
+                        f = schema[i]
+                        title = f"**{f['name']}**" + (f" — {f.get('help')}" if f.get('help') else "")
+                        label_updates.append(gr.update(visible=True, value=title))
+                        cat = f.get('category')
+                        # dropdown
+                        if cat == 'enum':
+                            dropdown_updates.append(gr.update(visible=True, choices=f.get('choices') or [], value=f.get('default')))
+                        else:
+                            dropdown_updates.append(gr.update(visible=False))
+                        # checkbox
+                        if cat == 'bool':
+                            check_updates.append(gr.update(visible=True, value=bool(f.get('default'))))
+                        else:
+                            check_updates.append(gr.update(visible=False))
+                        # number
+                        if cat in ('int','float'):
+                            number_updates.append(gr.update(visible=True, value=f.get('default')))
+                        else:
+                            number_updates.append(gr.update(visible=False))
+                        # text
+                        if cat in ('str','list_str','list_int','list_float','dict'):
+                            dv = f.get('default')
+                            if cat.startswith('list') and isinstance(dv, list):
+                                dv = ",".join(str(x) for x in dv)
+                            elif cat == 'dict' and isinstance(dv, dict):
+                                dv = json.dumps(dv)
+                            text_updates.append(gr.update(visible=True, value=dv if dv is not None else ""))
+                        else:
+                            text_updates.append(gr.update(visible=False))
+                    else:
+                        # hide all for unused slots
+                        label_updates.append(gr.update(visible=False, value=""))
+                        dropdown_updates.append(gr.update(visible=False))
+                        check_updates.append(gr.update(visible=False))
+                        number_updates.append(gr.update(visible=False))
+                        text_updates.append(gr.update(visible=False))
+                return tuple(label_updates + dropdown_updates + check_updates + number_updates + text_updates)
+
+            def _peft_fill_simple_from_json(json_text: str):
+                import json
+                try:
+                    d = json.loads(json_text or "{}")
+                except Exception:
+                    d = {}
+                def _csv_list(v):
+                    if isinstance(v, list):
+                        return ",".join(str(x) for x in v)
+                    return v if isinstance(v, str) else ""
+                tm = _csv_list(d.get("target_modules", []))
+                mts = _csv_list(d.get("modules_to_save", []))
+                bias = d.get("bias", "none") or "none"
+                fio = bool(d.get("fan_in_fan_out", False))
+                return tm, mts, bias, fio
+
+            def _peft_build_generated_form_from_json(name: str, json_text: str):
+                import json
+                schema = get_tuner_schema(name) or []
+                hide_fields = {
+                    "peft_type",
+                    "peft_version",
+                    "auto_mapping",
+                    "revision",
+                    "task_type",
+                    "megatron_config",
+                    "megatron_core",
+                    "ensure_weight_tying",
+                    "alora_invocation_tokens",
+                    "inference_mode",
+                }
+                schema = [f for f in schema if f.get("name") not in hide_fields][:PF_MAX]
+                try:
+                    d = json.loads(json_text or "{}")
+                except Exception:
+                    d = {}
+
+                label_updates = []
+                dropdown_updates = []
+                check_updates = []
+                number_updates = []
+                text_updates = []
+                for i in range(PF_MAX):
+                    if i < len(schema):
+                        f = schema[i]
+                        title = f"**{f['name']}**" + (f" — {f.get('help')}" if f.get('help') else "")
+                        label_updates.append(gr.update(visible=True, value=title))
+                        cat = f.get('category')
+                        name = f.get('name')
+                        val = d.get(name, f.get('default'))
+                        # dropdown
+                        if cat == 'enum':
+                            dropdown_updates.append(gr.update(visible=True, choices=f.get('choices') or [], value=val))
+                            check_updates.append(gr.update(visible=False))
+                            number_updates.append(gr.update(visible=False))
+                            text_updates.append(gr.update(visible=False))
+                        elif cat == 'bool':
+                            check_updates.append(gr.update(visible=True, value=bool(val)))
+                            dropdown_updates.append(gr.update(visible=False))
+                            number_updates.append(gr.update(visible=False))
+                            text_updates.append(gr.update(visible=False))
+                        elif cat in ('int','float'):
+                            number_updates.append(gr.update(visible=True, value=val))
+                            dropdown_updates.append(gr.update(visible=False))
+                            check_updates.append(gr.update(visible=False))
+                            text_updates.append(gr.update(visible=False))
+                        elif cat in ('str','list_str','list_int','list_float','dict'):
+                            if cat.startswith('list') and isinstance(val, list):
+                                val = ",".join(str(x) for x in val)
+                            elif cat == 'dict' and isinstance(val, dict):
+                                try:
+                                    val = json.dumps(val)
+                                except Exception:
+                                    pass
+                            text_updates.append(gr.update(visible=True, value=val if val is not None else ""))
+                            dropdown_updates.append(gr.update(visible=False))
+                            check_updates.append(gr.update(visible=False))
+                            number_updates.append(gr.update(visible=False))
+                        else:
+                            # fallback to text
+                            text_updates.append(gr.update(visible=True, value=str(val) if val is not None else ""))
+                            dropdown_updates.append(gr.update(visible=False))
+                            check_updates.append(gr.update(visible=False))
+                            number_updates.append(gr.update(visible=False))
+                    else:
+                        label_updates.append(gr.update(visible=False, value=""))
+                        dropdown_updates.append(gr.update(visible=False))
+                        check_updates.append(gr.update(visible=False))
+                        number_updates.append(gr.update(visible=False))
+                        text_updates.append(gr.update(visible=False))
+
+                return tuple(label_updates + dropdown_updates + check_updates + number_updates + text_updates)
+
+            # Build the generated form on tuner change and when loading defaults
+            # auto-generated form build removed
+
+            # Also refresh on LoRA type change so UI appears immediately after switching to PEFT
+            LoRA_type.change(
+                _peft_defaults_and_form,
+                inputs=[peft_tuner, peft_config_json],
+                outputs=[
+                    peft_config_json,
+                    peft_help,
+                ],
+            )
+            # no auto-generated form on LoRA type change
+
+            def _peft_apply_generated_form(tuner_name: str, json_text: str, *values):
+                import json
+                schema = (get_tuner_schema(tuner_name) or [])
+                hide_fields = {
+                    "peft_type",
+                    "peft_version",
+                    "auto_mapping",
+                    "revision",
+                    "task_type",
+                    "megatron_config",
+                    "megatron_core",
+                    "ensure_weight_tying",
+                    "alora_invocation_tokens",
+                    "inference_mode",
+                }
+                schema = [f for f in schema if f.get("name") not in hide_fields][:PF_MAX]
+                # values are grouped: labels[*], dropdowns[*], checks[*], numbers[*], texts[*]
+                d = {}
+                try:
+                    d = json.loads(json_text or "{}")
+                except Exception:
+                    d = {}
+                n = len(values) // 5 if values else 0
+                labels = values[0:n]
+                dropdowns = values[n:2*n]
+                checks = values[2*n:3*n]
+                numbers = values[3*n:4*n]
+                texts = values[4*n:5*n]
+
+                for i, f in enumerate(schema):
+                    # pick values per field
+                    dd = dropdowns[i] if i < len(dropdowns) else None
+                    cb = checks[i] if i < len(checks) else None
+                    num = numbers[i] if i < len(numbers) else None
+                    txt = texts[i] if i < len(texts) else None
+                    cat = f.get('category')
+                    name = f.get('name')
+                    val = None
+                    try:
+                        if cat == 'enum':
+                            val = dd
+                        elif cat == 'bool':
+                            val = bool(cb)
+                        elif cat in ('int','float'):
+                            val = num
+                            if cat == 'int' and val is not None:
+                                val = int(val)
+                        elif cat.startswith('list'):
+                            items = [t.strip() for t in (txt or "").split(',') if t.strip()]
+                            if cat=='list_int':
+                                val = [int(x) for x in items]
+                            elif cat=='list_float':
+                                val = [float(x) for x in items]
+                            else:
+                                val = items
+                        elif cat=='dict':
+                            val = json.loads(txt) if (txt or '').strip() else {}
+                        else:
+                            val = txt
+                    except Exception:
+                        # Keep previous value if parsing fails
+                        val = d.get(name, f.get('default'))
+                    d[name] = val
+                import json
+                return json.dumps(d, indent=2, sort_keys=True)
+
+            # no generated form updates or simple field syncs; JSON is the single source of truth
+            peft_load_defaults.click(
+                _peft_defaults_and_form,
+                inputs=[peft_tuner],
+                outputs=[
+                    peft_config_json,
+                    peft_help,
+                ],
+            )
+
+            # removed simple form helpers and syncing; not needed
 
         global executor
         executor = CommandExecutor(headless=headless)
@@ -3336,6 +3764,9 @@ def lora_tab(
             spline_gate,
             spline_scale,
             spline_centers,
+            # PEFT controls
+            peft_tuner,
+            peft_config_json,
         ]
 
         # Validate that callback inputs match function signatures to catch unused/missing args early
@@ -3499,30 +3930,88 @@ def lora_tab(
         sc_cb = _wrap_by_signature(save_configuration, "save_configuration")
         tm_cb = _wrap_by_signature(train_model, "train_model")
 
+        # Helper to open the Parameters accordion before heavy updates
+        def _open_parameters():
+            return gr.update(open=True)
+
+        # Single-shot loader that returns base outputs + PEFT simple fields + generated form updates.
+        def _oc_plus_peft(*args):
+            """Wrapper around open_configuration that always returns the expected number of outputs.
+
+            On failure (e.g., config path invalid), fall back to returning the current inputs
+            (pass-through) and a neutral update for the trailing convolution_row output to
+            keep Gradio's outputs arity satisfied.
+            """
+            expected_len = 1 + len(settings_list) + 1 + 1  # cfg + settings + training_preset + convolution_row
+            try:
+                base = oc_cb(*args)
+                base_list = list(base) if isinstance(base, (list, tuple)) else [base]
+                if len(base_list) > expected_len:
+                    base_list = base_list[:expected_len]
+                # If the callback returned nothing or just [None], fall back below
+                if not base_list or (len(base_list) == 1 and base_list[0] is None):
+                    raise ValueError("open_configuration returned no outputs")
+                return tuple(base_list)
+            except Exception as e:
+                log.error(f"Config load fallback: {e}")
+                # Pass-through current inputs; oc_inputs_* are [config_file_name] + settings_list + [training_preset]
+                fb = list(args)
+                # Add a neutral update for convolution_row as the last output
+                try:
+                    fb.append(gr.update())
+                except Exception:
+                    fb.append(None)
+                if len(fb) > expected_len:
+                    fb = fb[:expected_len]
+                return tuple(fb)
+
         configuration.button_open_config.click(
-            oc_cb,
+            _open_parameters,
+            inputs=[],
+            outputs=[parameters_acc],
+            show_progress=False,
+        ).then(
+            _oc_plus_peft,
             inputs=oc_inputs_open,
-            outputs=[configuration.config_file_name]
-            + settings_list
-            + [training_preset, convolution_row],
+            outputs=[configuration.config_file_name] + settings_list + [training_preset, convolution_row],
             show_progress=False,
         )
 
+        # Load config when clicking the load button
         configuration.button_load_config.click(
-            oc_cb,
+            _open_parameters,
+            inputs=[],
+            outputs=[parameters_acc],
+            show_progress=False,
+        ).then(
+            _oc_plus_peft,
             inputs=oc_inputs_load,
-            outputs=[configuration.config_file_name]
-            + settings_list
-            + [training_preset, convolution_row],
+            outputs=[configuration.config_file_name] + settings_list + [training_preset, convolution_row],
+            show_progress=False,
+        )
+
+        # Also load immediately when the config dropdown value changes
+        configuration.config_file_name.change(
+            _open_parameters,
+            inputs=[],
+            outputs=[parameters_acc],
+            show_progress=False,
+        ).then(
+            _oc_plus_peft,
+            inputs=oc_inputs_load,
+            outputs=[configuration.config_file_name] + settings_list + [training_preset, convolution_row],
             show_progress=False,
         )
 
         training_preset.input(
-            oc_cb,
+            _open_parameters,
+            inputs=[],
+            outputs=[parameters_acc],
+            show_progress=False,
+        ).then(
+            _oc_plus_peft,
             inputs=oc_inputs_preset,
-            outputs=[gr.Textbox(visible=False)]
-            + settings_list
-            + [training_preset, convolution_row],
+            outputs=[gr.Textbox(visible=False)] + settings_list + [training_preset, convolution_row],
             show_progress=False,
         )
 

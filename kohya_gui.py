@@ -34,6 +34,8 @@ def initialize_ui_interface(config, headless, use_shell, release_info, readme_co
     ui_interface = gr.Blocks(css=css, title=f"Kohya_ss GUI {release_info}", theme=gr.themes.Default())
     with ui_interface:
         # Create tabs for different functionalities
+        with gr.Tab("LoRA"):
+            lora_tab(headless=headless, config=config, use_shell_flag=use_shell)
         with gr.Tab("Dreambooth"):
             (
                 train_data_dir_input,
@@ -41,8 +43,6 @@ def initialize_ui_interface(config, headless, use_shell, release_info, readme_co
                 output_dir_input,
                 logging_dir_input,
             ) = dreambooth_tab(headless=headless, config=config, use_shell_flag=use_shell)
-        with gr.Tab("LoRA"):
-            lora_tab(headless=headless, config=config, use_shell_flag=use_shell)
         with gr.Tab("Textual Inversion"):
             ti_tab(headless=headless, config=config, use_shell_flag=use_shell)
         with gr.Tab("Finetuning"):

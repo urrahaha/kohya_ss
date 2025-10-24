@@ -35,5 +35,6 @@ transformers==4.44.2
 voluptuous==0.13.1
 wandb==0.18.0
 hpsv2
+peft @ git+https://github.com/huggingface/peft
 # for kohya_ss sd-scripts library
 -e ./sd-scripts
